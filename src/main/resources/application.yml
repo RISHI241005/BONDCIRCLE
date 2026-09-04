@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: chat-service
+  config:
+    import: optional:file:.env[.properties]
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+# Springdoc OpenAPI Swagger UI Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    enabled: true
+
+# Chat Application Business Configurations
+chat:
+  jwt:
+    secret: ${JWT_SECRET:test-only-secret-key-change-before-production-0123456789abcdef}
+    issuer: ${JWT_ISSUER:dating-app-auth-service}
+    expiration-ms: ${JWT_EXPIRATION:86400000}
+  message:
+    max-length: 2000
+    default-page-size: 30
+    max-page-size: 100

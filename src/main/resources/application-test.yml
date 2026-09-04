@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:chat_test_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+  flyway:
+    enabled: false
+
+chat:
+  jwt:
+    secret: test-only-secret-key-change-before-production-0123456789abcdef
+    issuer: test-dating-auth
+    expiration-ms: 3600000
+
+logging:
+  level:
+    root: WARN
+    com.datingapp.chat: DEBUG

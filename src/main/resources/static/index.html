@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Private, real-time conversations with people you know by phone number.">
+    <meta name="theme-color" content="#0b1020">
+    <title>BondCircle · Private chat</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <main id="authView" class="auth-layout">
+        <section class="auth-intro" aria-labelledby="welcomeTitle">
+            <a class="brand brand--light" href="/" aria-label="BondCircle home">
+                <span class="brand-mark" aria-hidden="true"><span></span><span></span></span>
+                <span>BondCircle</span>
+            </a>
+            <div class="intro-copy">
+                <p class="eyebrow">Your people, one tap away</p>
+                <h1 id="welcomeTitle">A quieter place to talk.</h1>
+                <p>Find someone by phone number and start a private, real-time conversation. No public feed. No noise.</p>
+            </div>
+            <div class="intro-preview" aria-hidden="true">
+                <div class="preview-row preview-row--right">Are you free this evening?</div>
+                <div class="preview-row preview-row--left">Absolutely. Call at 7?</div>
+                <div class="preview-status"><span></span> Delivered instantly</div>
+            </div>
+        </section>
+
+        <section class="auth-panel" aria-label="Account access">
+            <div class="auth-card">
+                <div class="mobile-brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span></span><span>BondCircle</span></div>
+                <div class="auth-tabs" role="tablist" aria-label="Sign in or register">
+                    <button id="loginTab" class="auth-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="loginForm">Sign in</button>
+                    <button id="registerTab" class="auth-tab" type="button" role="tab" aria-selected="false" aria-controls="registerForm">Create account</button>
+                </div>
+
+                <form id="loginForm" class="auth-form" novalidate>
+                    <div class="form-heading"><h2>Welcome back</h2><p>Use the phone number linked to your account.</p></div>
+                    <label>Phone number<input id="loginPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+91 98765 43210" required></label>
+                    <label>Password<input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="Your password" minlength="8" required></label>
+                    <p id="loginError" class="form-error" role="alert"></p>
+                    <button class="primary-button" type="submit"><span>Sign in</span><span aria-hidden="true">→</span></button>
+                </form>
+
+                <form id="registerForm" class="auth-form" hidden novalidate>
+                    <div class="form-heading"><h2>Create your account</h2><p>Your phone number helps people who know you find you.</p></div>
+                    <div class="field-row">
+                        <label>Full name<input id="registerName" name="fullName" autocomplete="name" placeholder="Rishi Kumar" maxlength="100" required></label>
+                        <label>Phone number<input id="registerPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+91 98765 43210" maxlength="20" required></label>
+                    </div>
+                    <label>Email<input id="registerEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" maxlength="100" required></label>
+                    <div class="field-row">
+                        <label>Password<input id="registerPassword" name="password" type="password" autocomplete="new-password" placeholder="8+ strong characters" minlength="8" maxlength="128" required></label>
+                        <label>Confirm password<input id="registerConfirm" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Repeat password" minlength="8" maxlength="128" required></label>
+                    </div>
+                    <p class="password-hint">Use uppercase, lowercase, a number, and one of ! @ # $ % ^ &amp; *</p>
+                    <p id="registerError" class="form-error" role="alert"></p>
+                    <button class="primary-button" type="submit"><span>Create account</span><span aria-hidden="true">→</span></button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <main id="chatView" class="chat-app" hidden>
+        <header class="app-header">
+            <a class="brand" href="/" aria-label="BondCircle home"><span class="brand-mark" aria-hidden="true"><span></span><span></span></span><span>BondCircle</span></a>
+            <div class="account-actions">
+                <div class="live-state"><span id="liveDot" class="live-dot"></span><span id="liveLabel">Connecting</span></div>
+                <div id="profileAvatar" class="avatar avatar--small" aria-hidden="true">BC</div>
+                <div class="account-copy"><strong id="profileName">Account</strong><span id="profilePhone"></span></div>
+                <button id="logoutButton" class="icon-button" type="button" title="Sign out" aria-label="Sign out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/></svg></button>
+            </div>
+        </header>
+
+        <div class="workspace">
+            <aside id="sidebar" class="sidebar" aria-label="Conversations">
+                <div class="sidebar-heading">
+                    <div><p class="eyebrow">Messages</p><h1>Chats</h1></div>
+                    <button id="focusSearchButton" class="icon-button icon-button--accent" type="button" title="New chat" aria-label="Start a new chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+                </div>
+                <form id="peopleSearchForm" class="phone-search" role="search">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <label class="sr-only" for="peopleSearchInput">Find a person by phone number</label>
+                    <input id="peopleSearchInput" type="tel" inputmode="tel" autocomplete="off" placeholder="Find by phone number" required>
+                    <button type="submit">Find</button>
+                </form>
+                <div id="searchResult" class="search-result" aria-live="polite"></div>
+                <div class="list-label"><span>Recent</span><span id="conversationCount">0 chats</span></div>
+                <div id="conversationList" class="conversation-list"><div class="list-loading"><span></span><span></span><span></span></div></div>
+            </aside>
+
+            <section id="conversationPane" class="conversation-pane" aria-label="Current conversation">
+                <div id="emptyConversation" class="conversation-empty">
+                    <div class="empty-orbit" aria-hidden="true"><span class="brand-mark brand-mark--large"><span></span><span></span></span></div>
+                    <h2>Start with a phone number</h2>
+                    <p>Find someone you know, then send your first message. Your conversation will appear here.</p>
+                    <button id="emptySearchButton" class="secondary-button" type="button">Find someone</button>
+                </div>
+                <div id="activeConversation" class="active-conversation" hidden>
+                    <header class="conversation-header">
+                        <button id="mobileBackButton" class="icon-button mobile-back" type="button" aria-label="Back to chats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+                        <div id="chatAvatar" class="avatar">?</div>
+                        <div class="conversation-person"><strong id="chatName">Conversation</strong><span id="chatPresence">Offline</span></div>
+                        <div class="secure-note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Private chat</div>
+                    </header>
+                    <div id="messageList" class="message-list" aria-live="polite" aria-label="Messages"></div>
+                    <div id="typingIndicator" class="typing" hidden><span></span><span></span><span></span><em>typing</em></div>
+                    <form id="messageForm" class="composer">
+                        <label class="sr-only" for="messageInput">Message</label>
+                        <textarea id="messageInput" rows="1" maxlength="2000" placeholder="Write a message…" required></textarea>
+                        <span id="characterCount" class="character-count">0 / 2000</span>
+                        <button id="sendButton" class="send-button" type="submit" aria-label="Send message" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
+                    </form>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script type="module" src="/js/app.js"></script>
+</body>
+</html>
