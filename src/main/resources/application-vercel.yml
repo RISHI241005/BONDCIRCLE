@@ -17,3 +17,5 @@ spring:
   flyway:
     locations: classpath:db/postgres
     baseline-on-migrate: false
+
+CORS_ALLOWED_ORIGINS: "https://${VERCEL_PROJECT_PRODUCTION_URL:project-rub88.vercel.app},https://${VERCEL_URL:project-rub88.vercel.app}"
