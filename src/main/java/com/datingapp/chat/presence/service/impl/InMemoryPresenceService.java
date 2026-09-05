@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Supports multiple concurrent device sessions per user (e.g. Android phone + iOS tablet).
  */
 @Service
+@org.springframework.context.annotation.Profile("!vercel")
 public class InMemoryPresenceService implements PresenceService {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryPresenceService.class);

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
+@org.springframework.context.annotation.Profile("!vercel")
 public class WebSocketBroadcastServiceImpl implements WebSocketBroadcastService {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketBroadcastServiceImpl.class);

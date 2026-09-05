@@ -21,6 +21,7 @@ import java.util.List;
  * Service responsible for validating incoming JWT tokens and extracting user claims.
  */
 @Service
+@org.springframework.context.annotation.Profile("!vercel")
 public class JwtService {
 
     private static final Logger log = LoggerFactory.getLogger(JwtService.class);
