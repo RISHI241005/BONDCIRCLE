@@ -4,18 +4,15 @@ COPY pom.xml .
 RUN mvn -B dependency:go-offline
 COPY src ./src
 RUN mvn -B -DskipTests package
+RUN javac --release 21 -d /build/portgate /build/src/deployment/java/PortGate.java
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends nginx \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /tmp/nginx/client_body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi
 COPY --from=build /build/target/chat-service-1.0.0-SNAPSHOT.jar /app/chat-service.jar
-COPY vercel-nginx.conf /app/vercel-nginx.conf
+COPY --from=build /build/portgate /app/portgate
 COPY vercel-entrypoint.sh /app/vercel-entrypoint.sh
 RUN chmod 755 /app/vercel-entrypoint.sh \
-    && chown -R 10001:10001 /app /tmp/nginx
+    && chown -R 10001:10001 /app
 ENV SPRING_PROFILES_ACTIVE=prod,vercel
 ENV PORT=8080
 EXPOSE 8080

@@ -1,12 +1,8 @@
 #!/bin/sh
 set -eu
 
-mkdir -p \
-  /tmp/nginx/client_body \
-  /tmp/nginx/proxy \
-  /tmp/nginx/fastcgi \
-  /tmp/nginx/uwsgi \
-  /tmp/nginx/scgi
+/opt/java/openjdk/bin/java -cp /app/portgate PortGate &
+gate_pid=$!
 
 /opt/java/openjdk/bin/java \
   -Duser.timezone=UTC \
@@ -16,8 +12,10 @@ java_pid=$!
 
 stop_java() {
   kill -TERM "$java_pid" 2>/dev/null || true
+  kill -TERM "$gate_pid" 2>/dev/null || true
   wait "$java_pid" 2>/dev/null || true
+  wait "$gate_pid" 2>/dev/null || true
 }
 
 trap stop_java EXIT TERM INT
-nginx -c /app/vercel-nginx.conf -g 'daemon off;'
+wait "$java_pid"
