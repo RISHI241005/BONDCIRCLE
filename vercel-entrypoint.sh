@@ -1,6 +1,13 @@
 #!/bin/sh
 set -eu
 
+mkdir -p \
+  /tmp/nginx/client_body \
+  /tmp/nginx/proxy \
+  /tmp/nginx/fastcgi \
+  /tmp/nginx/uwsgi \
+  /tmp/nginx/scgi
+
 /opt/java/openjdk/bin/java \
   -Duser.timezone=UTC \
   -jar /app/chat-service.jar \
