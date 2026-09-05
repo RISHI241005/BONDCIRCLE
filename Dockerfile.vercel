@@ -12,4 +12,4 @@ ENV SPRING_PROFILES_ACTIVE=prod,vercel
 ENV PORT=8080
 EXPOSE 8080
 USER 10001:10001
-ENTRYPOINT ["java", "-Duser.timezone=UTC", "-jar", "/app/chat-service.jar"]
+ENTRYPOINT ["/opt/java/openjdk/bin/java", "-Duser.timezone=UTC", "-jar", "/app/chat-service.jar"]
