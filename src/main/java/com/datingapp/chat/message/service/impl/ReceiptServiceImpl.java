@@ -11,7 +11,7 @@ import com.datingapp.chat.message.entity.Message;
 import com.datingapp.chat.message.entity.MessageStatus;
 import com.datingapp.chat.message.repository.MessageRepository;
 import com.datingapp.chat.message.service.ReceiptService;
-import com.datingapp.chat.presence.service.impl.InMemoryPresenceService;
+import com.datingapp.chat.presence.service.PresenceService;
 import com.datingapp.chat.websocket.service.WebSocketBroadcastService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,14 +33,14 @@ public class ReceiptServiceImpl implements ReceiptService {
     private final ConversationParticipantRepository participantRepository;
     private final ConversationService conversationService;
     private final WebSocketBroadcastService broadcastService;
-    private final InMemoryPresenceService presenceService;
+    private final PresenceService presenceService;
 
     public ReceiptServiceImpl(
             MessageRepository messageRepository,
             ConversationParticipantRepository participantRepository,
             ConversationService conversationService,
             WebSocketBroadcastService broadcastService,
-            InMemoryPresenceService presenceService) {
+            PresenceService presenceService) {
         this.messageRepository = messageRepository;
         this.participantRepository = participantRepository;
         this.conversationService = conversationService;
