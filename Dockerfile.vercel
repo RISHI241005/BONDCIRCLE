@@ -7,9 +7,17 @@ RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nginx \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /tmp/nginx/client_body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi
 COPY --from=build /build/target/chat-service-1.0.0-SNAPSHOT.jar /app/chat-service.jar
+COPY vercel-nginx.conf /app/vercel-nginx.conf
+COPY vercel-entrypoint.sh /app/vercel-entrypoint.sh
+RUN chmod 755 /app/vercel-entrypoint.sh \
+    && chown -R 10001:10001 /app /tmp/nginx
 ENV SPRING_PROFILES_ACTIVE=prod,vercel
 ENV PORT=8080
 EXPOSE 8080
 USER 10001:10001
-ENTRYPOINT ["/opt/java/openjdk/bin/java", "-Duser.timezone=UTC", "-jar", "/app/chat-service.jar"]
+ENTRYPOINT ["/app/vercel-entrypoint.sh"]

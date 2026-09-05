@@ -3,4 +3,6 @@
 !src/
 !src/**
 !Dockerfile.vercel
+!vercel-entrypoint.sh
+!vercel-nginx.conf
 src/**/*.bak
