@@ -18,6 +18,7 @@ import com.datingapp.chat.message.entity.MessageType;
 import com.datingapp.chat.message.repository.MessageRepository;
 import com.datingapp.chat.message.service.IdempotencyService;
 import com.datingapp.chat.message.service.MessageService;
+import com.datingapp.chat.moderation.service.LanguageModerationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -41,6 +42,7 @@ public class MessageServiceImpl implements MessageService {
     private final RateLimitProperties rateLimitProperties;
     private final com.datingapp.chat.websocket.service.WebSocketBroadcastService webSocketBroadcastService;
     private final com.datingapp.chat.block.service.BlockService blockService;
+    private final LanguageModerationService moderationService;
     private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     public MessageServiceImpl(
@@ -51,6 +53,7 @@ public class MessageServiceImpl implements MessageService {
             RateLimitProperties rateLimitProperties,
             com.datingapp.chat.websocket.service.WebSocketBroadcastService webSocketBroadcastService,
             com.datingapp.chat.block.service.BlockService blockService,
+            LanguageModerationService moderationService,
             org.springframework.transaction.PlatformTransactionManager transactionManager) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
@@ -59,6 +62,7 @@ public class MessageServiceImpl implements MessageService {
         this.rateLimitProperties = rateLimitProperties;
         this.webSocketBroadcastService = webSocketBroadcastService;
         this.blockService = blockService;
+        this.moderationService = moderationService;
         this.transactionTemplate = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
     }
 
@@ -77,6 +81,7 @@ public class MessageServiceImpl implements MessageService {
                         "Message exceeds maximum allowed character length of " + rateLimitProperties.getMaxLength(),
                         ErrorCode.MESSAGE_TOO_LONG);
             }
+            validateModeration(request.getContent(), request.isModerationOverride());
 
             // 3. Idempotency check: verify if clientMessageId already processed for this sender
             if (request.getClientMessageId() != null && !request.getClientMessageId().isBlank()) {
@@ -166,6 +171,7 @@ public class MessageServiceImpl implements MessageService {
         if (request.getContent() == null || request.getContent().trim().isEmpty()) {
             throw new BadRequestException("Message content cannot be blank", ErrorCode.EMPTY_MESSAGE_CONTENT);
         }
+        validateModeration(request.getContent(), request.isModerationOverride());
 
         message.setContent(request.getContent().trim());
         message.setStatus(MessageStatus.EDITED);
@@ -212,6 +218,14 @@ public class MessageServiceImpl implements MessageService {
         }
 
         return mapToResponse(message);
+    }
+
+    private void validateModeration(String content, boolean moderationOverride) {
+        if (!moderationOverride && moderationService.analyze(content).flagged()) {
+            throw new BadRequestException(
+                    "Inappropriate language detected. Review the message or explicitly confirm sending at your own risk.",
+                    ErrorCode.INAPPROPRIATE_LANGUAGE);
+        }
     }
 
     @Override

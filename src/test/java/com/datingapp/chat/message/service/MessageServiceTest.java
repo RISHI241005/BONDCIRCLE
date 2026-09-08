@@ -15,6 +15,7 @@ import com.datingapp.chat.message.entity.MessageType;
 import com.datingapp.chat.message.repository.MessageRepository;
 import com.datingapp.chat.message.service.impl.IdempotencyServiceImpl;
 import com.datingapp.chat.message.service.impl.MessageServiceImpl;
+import com.datingapp.chat.moderation.service.LanguageModerationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,6 +70,7 @@ class MessageServiceTest {
                 rateLimitProperties,
                 webSocketBroadcastService,
                 blockService,
+                new LanguageModerationService(),
                 txManager
         );
     }
@@ -152,6 +154,51 @@ class MessageServiceTest {
     void testBlankMessageContent() {
         SendMessageRequest request = new SendMessageRequest("   ");
         assertThrows(BadRequestException.class, () -> messageService.sendMessage("conv-uuid", 101L, request));
+    }
+
+    @Test
+    @DisplayName("Should require an explicit override for flagged language")
+    void testModerationRequiresOverride() {
+        SendMessageRequest request = new SendMessageRequest("You are an idiot");
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> messageService.sendMessage("conv-uuid", 101L, request));
+
+        assertEquals(com.datingapp.chat.common.exception.ErrorCode.INAPPROPRIATE_LANGUAGE, exception.getErrorCode());
+        verify(messageRepository, never()).save(any(Message.class));
+    }
+
+    @Test
+    @DisplayName("Should accept flagged language after explicit user confirmation")
+    void testModerationOverride() {
+        String convPublicId = "conv-override";
+        Long senderId = 101L;
+        Conversation conv = new Conversation();
+        conv.setId(20L);
+        conv.setPublicId(convPublicId);
+        when(conversationService.getConversationEntity(convPublicId)).thenReturn(conv);
+
+        SendMessageRequest request = new SendMessageRequest("You are an idiot", "override-1", null);
+        request.setModerationOverride(true);
+
+        Message saved = new Message();
+        saved.setId(200L);
+        saved.setPublicId("message-override");
+        saved.setConversation(conv);
+        saved.setSenderId(senderId);
+        saved.setClientMessageId("override-1");
+        saved.setContent(request.getContent());
+        saved.setMessageType(MessageType.TEXT);
+        saved.setStatus(MessageStatus.SENT);
+        saved.setCreatedAt(Instant.now());
+        saved.setUpdatedAt(Instant.now());
+        when(messageRepository.save(any(Message.class))).thenReturn(saved);
+
+        MessageResponse response = messageService.sendMessage(convPublicId, senderId, request);
+
+        assertEquals("message-override", response.getId());
+        verify(messageRepository).save(any(Message.class));
     }
 
     @Test

@@ -11,6 +11,7 @@ public enum ErrorCode {
     INVALID_MESSAGE_TYPE("INVALID_MESSAGE_TYPE", "Message type is not supported"),
     EMPTY_MESSAGE_CONTENT("EMPTY_MESSAGE_CONTENT", "Message content cannot be empty"),
     MESSAGE_TOO_LONG("MESSAGE_TOO_LONG", "Message content exceeds maximum allowed length"),
+    INAPPROPRIATE_LANGUAGE("INAPPROPRIATE_LANGUAGE", "Message contains inappropriate language and requires confirmation"),
 
     // 401 Unauthorized
     UNAUTHORIZED("UNAUTHORIZED", "Authentication credentials are missing or invalid"),

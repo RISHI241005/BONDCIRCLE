@@ -15,6 +15,9 @@ public class EditMessageRequest {
     @Schema(description = "New message text content", example = "Hey, are you free at 7:30?")
     private String content;
 
+    @Schema(description = "Explicit confirmation to save text that was flagged by the safety check", defaultValue = "false")
+    private boolean moderationOverride;
+
     public EditMessageRequest() {
     }
 
@@ -28,5 +31,13 @@ public class EditMessageRequest {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public boolean isModerationOverride() {
+        return moderationOverride;
+    }
+
+    public void setModerationOverride(boolean moderationOverride) {
+        this.moderationOverride = moderationOverride;
     }
 }

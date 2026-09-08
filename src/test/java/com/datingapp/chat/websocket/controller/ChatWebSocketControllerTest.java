@@ -63,6 +63,7 @@ class ChatWebSocketControllerTest {
         StompPrincipal principal = new StompPrincipal(101L);
         WsMessagePayload payload = new WsMessagePayload("conv-uuid-1", "Hello via WebSocket!");
         payload.setClientMessageId("client-ws-1");
+        payload.setModerationOverride(true);
 
         controller.handleSendMessage(payload, principal);
 
@@ -73,6 +74,7 @@ class ChatWebSocketControllerTest {
         assertEquals("Hello via WebSocket!", captured.getContent());
         assertEquals("client-ws-1", captured.getClientMessageId());
         assertEquals(MessageType.TEXT, captured.getType());
+        assertEquals(true, captured.isModerationOverride());
     }
 
     @Test

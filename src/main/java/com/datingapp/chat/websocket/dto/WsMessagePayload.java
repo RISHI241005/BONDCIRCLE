@@ -24,6 +24,8 @@ public class WsMessagePayload {
 
     private MessageType type = MessageType.TEXT;
 
+    private boolean moderationOverride;
+
     public WsMessagePayload() {
     }
 
@@ -70,5 +72,13 @@ public class WsMessagePayload {
 
     public void setType(MessageType type) {
         this.type = type != null ? type : MessageType.TEXT;
+    }
+
+    public boolean isModerationOverride() {
+        return moderationOverride;
+    }
+
+    public void setModerationOverride(boolean moderationOverride) {
+        this.moderationOverride = moderationOverride;
     }
 }

@@ -16,6 +16,8 @@ const state = {
     heartbeatTimer: null,
     typingTimer: null,
     sentTyping: false,
+    moderationChecking: false,
+    pendingModeratedMessage: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -441,6 +443,31 @@ async function sendMessage(event) {
     event.preventDefault();
     const input = $("messageInput");
     const content = input.value.trim();
+    if (!content || !state.activeId || state.moderationChecking) return;
+
+    clearModerationWarning();
+    state.moderationChecking = true;
+    $("sendButton").disabled = true;
+    try {
+        const result = await api("/moderation/check", {
+            method: "POST",
+            body: JSON.stringify({ content }),
+        });
+        if (input.value.trim() !== content) return;
+        if (result?.flagged) {
+            showModerationWarning(content, result.matchedTerms || []);
+            return;
+        }
+        await performSend(content, false);
+    } catch (err) {
+        showToast(err.message, "error");
+    } finally {
+        state.moderationChecking = false;
+        resizeComposer();
+    }
+}
+
+async function performSend(content, moderationOverride) {
     if (!content || !state.activeId) return;
     const clientMessageId = crypto.randomUUID ? crypto.randomUUID() : `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const optimistic = {
@@ -454,18 +481,20 @@ async function sendMessage(event) {
         pending: true,
     };
     upsertMessage(optimistic);
-    input.value = "";
+    const input = $("messageInput");
+    if (input.value.trim() === content) input.value = "";
+    clearModerationWarning();
     resizeComposer();
     sendTyping(false);
 
-    const payload = { conversationId: state.activeId, content, clientMessageId, type: "TEXT" };
+    const payload = { conversationId: state.activeId, content, clientMessageId, type: "TEXT", moderationOverride };
     try {
         if (state.stompConnected) {
             sendApplicationMessage("/app/chat.send", payload);
         } else {
             const saved = await api(`/chats/${encodeURIComponent(state.activeId)}/messages`, {
                 method: "POST",
-                body: JSON.stringify({ content, clientMessageId, type: "TEXT" }),
+                body: JSON.stringify({ content, clientMessageId, type: "TEXT", moderationOverride }),
             });
             upsertMessage(saved);
         }
@@ -475,6 +504,41 @@ async function sendMessage(event) {
         renderMessages();
         showToast(err.message, "error");
     }
+}
+
+function showModerationWarning(content, matchedTerms) {
+    state.pendingModeratedMessage = content;
+    $("messageForm").classList.add("is-flagged");
+    $("moderationHint").hidden = false;
+    const terms = $("moderationTerms");
+    terms.textContent = "";
+    for (const term of matchedTerms.slice(0, 6)) {
+        const chip = document.createElement("span");
+        chip.textContent = term;
+        terms.appendChild(chip);
+    }
+    $("moderationModal").hidden = false;
+    document.body.style.overflow = "hidden";
+    $("moderationEdit").focus();
+}
+
+function closeModerationWarning() {
+    state.pendingModeratedMessage = null;
+    $("moderationModal").hidden = true;
+    document.body.style.overflow = "";
+    $("messageInput").focus();
+}
+
+function clearModerationWarning() {
+    $("messageForm").classList.remove("is-flagged");
+    $("moderationHint").hidden = true;
+}
+
+async function sendModeratedMessage() {
+    const content = state.pendingModeratedMessage;
+    if (!content) return;
+    closeModerationWarning();
+    await performSend(content, true);
 }
 
 function acknowledgeLatestIncoming(messages) {
@@ -500,6 +564,7 @@ function resizeComposer() {
 }
 
 function handleComposerInput() {
+    clearModerationWarning();
     resizeComposer();
     if (!state.activeId || !state.stompConnected) return;
     if (!state.sentTyping && $("messageInput").value.trim()) sendTyping(true);
@@ -694,6 +759,15 @@ $("messageInput").addEventListener("keydown", (event) => {
         event.preventDefault();
         $("messageForm").requestSubmit();
     }
+});
+$("moderationClose").addEventListener("click", closeModerationWarning);
+$("moderationEdit").addEventListener("click", closeModerationWarning);
+$("moderationSendAnyway").addEventListener("click", () => sendModeratedMessage().catch((err) => showToast(err.message, "error")));
+$("moderationModal").addEventListener("click", (event) => {
+    if (event.target === $("moderationModal")) closeModerationWarning();
+});
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !$("moderationModal").hidden) closeModerationWarning();
 });
 
 if (state.token && state.profile) enterChat();

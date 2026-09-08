@@ -25,6 +25,9 @@ public class SendMessageRequest {
     @Schema(description = "Message type", example = "TEXT", defaultValue = "TEXT")
     private MessageType type = MessageType.TEXT;
 
+    @Schema(description = "Explicit confirmation to send a message that was flagged by the safety check", defaultValue = "false")
+    private boolean moderationOverride;
+
     public SendMessageRequest() {
     }
 
@@ -68,5 +71,13 @@ public class SendMessageRequest {
 
     public void setType(MessageType type) {
         this.type = type != null ? type : MessageType.TEXT;
+    }
+
+    public boolean isModerationOverride() {
+        return moderationOverride;
+    }
+
+    public void setModerationOverride(boolean moderationOverride) {
+        this.moderationOverride = moderationOverride;
     }
 }

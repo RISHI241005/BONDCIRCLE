@@ -14,6 +14,7 @@ A phone-number-first chat website built with **Java 21**, **Spring Boot 3.3.3**,
 - **Delivery & Read Receipts**: Realtime status transitions (`SENT` → `DELIVERED` → `READ`) with watermarked unread counters.
 - **Ephemeral Typing Indicators**: Broadcasts partner typing state without database overhead (`/app/chat.typing` → `/user/queue/typing`).
 - **Multi-Device Presence Tracking**: Tracks simultaneous device sessions per user (e.g. Android phone + iOS tablet) and maintains accurate `lastSeenAt` timestamps.
+- **English & Hinglish Language Warning**: Drafts with common abusive terms, spelling variants, leetspeak, or separated-letter obfuscation open an accessible pre-send warning; REST and WebSocket sends require an explicit override before flagged text is accepted.
 - **Content Moderation & Safety**: Bi-directional blocking (`BlockService`) and conversation/message reporting (`ReportService`).
 - **Database Migrations (Flyway)**: Versioned schema evolution with zero reliance on `hibernate.ddl-auto=create`.
 - **OpenAPI 3.0 / Swagger UI**: Interactive API documentation at `/swagger-ui.html`.
@@ -128,6 +129,7 @@ Interactive Swagger UI is accessible at:
 | `DELETE` | `/api/v1/chats/{id}` | Archive / leave conversation |
 | `GET` | `/api/v1/chats/{id}/messages` | Cursor-paginated message history (`limit`, `cursor`) |
 | `POST` | `/api/v1/chats/{id}/messages` | Send message (REST fallback with `clientMessageId`) |
+| `POST` | `/api/v1/moderation/check` | Check a draft for common English and Hinglish abusive language |
 | `POST` | `/api/v1/chats/{id}/read` | Acknowledge read receipt up to specified message |
 | `PATCH` | `/api/v1/chats/{id}/messages/{msgId}` | Edit sender's message content |
 | `DELETE` | `/api/v1/chats/{id}/messages/{msgId}` | Soft-delete sender's message |
@@ -153,6 +155,8 @@ Interactive Swagger UI is accessible at:
 - `/app/chat.typing`: Emit typing status (`{ "conversationId": "uuid", "typing": true }`)
 - `/app/chat.delivered`: Acknowledge message delivery
 - `/app/chat.read`: Acknowledge message read
+
+Flagged REST and `/app/chat.send` payloads are rejected with `INAPPROPRIATE_LANGUAGE` unless the user has confirmed the warning and the payload includes `"moderationOverride": true`.
 
 ### Subscriptions (`/user/queue/*`)
 - `/user/queue/messages`: Receive new messages and status transitions (`SENT`, `DELIVERED`, `READ`, `EDITED`, `DELETED`)

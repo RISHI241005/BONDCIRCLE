@@ -61,6 +61,7 @@ public class ChatWebSocketController {
         request.setClientMessageId(payload.getClientMessageId());
         request.setReplyToMessageId(payload.getReplyToMessageId());
         request.setType(payload.getType());
+        request.setModerationOverride(payload.isModerationOverride());
 
         messageService.sendMessage(payload.getConversationId(), senderId, request);
     }
