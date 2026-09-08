@@ -41,7 +41,7 @@ public class LanguageModerationService {
             "assignment", "assignments", "assess", "assessment", "passion", "passionate",
             "compass", "sheet", "sheets", "batch", "batches", "beach", "beaches",
             "witch", "witches", "pitch", "pitches", "ditch", "stitch", "kitchen",
-            "where", "wherever", "whole", "wholes", "wholesale"
+            "where", "wherever", "whole", "wholes", "wholesale", "randy"
     );
 
     public ModerationResult analyze(String content) {
@@ -55,6 +55,21 @@ public class LanguageModerationService {
             String label = findMatch(token);
             if (label != null) {
                 matches.add(label);
+            }
+        }
+
+        // Some South-Asian insults are commonly typed either as one word or
+        // as a two/three-word phrase. Check compact n-grams so spellings such
+        // as "kuttar baccha" and "khankir pola" are covered without making
+        // their harmless component words globally unsafe.
+        for (int start = 0; start < tokens.size(); start++) {
+            StringBuilder phrase = new StringBuilder(tokens.get(start));
+            for (int end = start + 1; end < Math.min(tokens.size(), start + 3); end++) {
+                phrase.append(tokens.get(end));
+                String label = findPhraseMatch(phrase.toString());
+                if (label != null) {
+                    matches.add(label);
+                }
             }
         }
 
@@ -130,6 +145,18 @@ public class LanguageModerationService {
             }
         }
         return null;
+    }
+
+    private static String findPhraseMatch(String compactPhrase) {
+        String compact = collapseRepeats(compactPhrase);
+        String label = TERMS.get(compactPhrase);
+        if (label == null) {
+            label = TERMS.get(compact);
+        }
+        if (label != null) {
+            return label;
+        }
+        return PHONETIC_TERMS.get(phoneticKey(compactPhrase));
     }
 
     private static List<String> tokenize(String content) {
@@ -243,6 +270,62 @@ public class LanguageModerationService {
         addTerms(terms, "ghatiya", "ghatiya", "ghatiyaa");
         addTerms(terms, "chapri", "chapri", "chhapri");
         addTerms(terms, "chhinal", "chhinal", "chinaal");
+
+        // Broader Hindi/Hinglish internet slang and common transliterations.
+        addTerms(terms, "bevda", "bevda", "bewda", "bevde", "bewde", "bevdey", "bewday");
+        addTerms(terms, "bhadwa", "bhadwa", "bhadvaa", "bhadva", "bhadua", "bhaduaa");
+        addTerms(terms, "bhosda", "bhosda", "bhosada", "bhosdaa", "bhonsda");
+        addTerms(terms, "bhosdiki", "bhosdiki", "bhosadiki", "bhosdikiwala", "bhosdikiwale");
+        addTerms(terms, "bsdk", "bsdk", "bhsdk", "bhosdk");
+        addTerms(terms, "charsi", "charsi", "charsii");
+        addTerms(terms, "chutad", "chutad", "chuttad", "chuttar");
+        addTerms(terms, "fattu", "fattu", "fattuu", "fatoo");
+        addTerms(terms, "gaand", "gaand", "gand", "gaandu", "gandiya", "gandiye");
+        addTerms(terms, "gandfat", "gandfat", "gaandfat", "gandfut", "gaandfut");
+        addTerms(terms, "gadhalund", "gadhalund", "gadhekalund");
+        addTerms(terms, "haramzada", "haramzada", "haramjada", "haraamzada", "haraamjada",
+                "haramzade", "haramjade", "haraamzade", "haraamjade");
+        addTerms(terms, "haramkhor", "haramkhor", "haraamkhor", "haramkhore");
+        addTerms(terms, "jhatu", "jhatu", "jhaatu", "jhatoo");
+        addTerms(terms, "kuttiya", "kutia", "kutiya", "kuttiya", "kuttiyaa");
+        addTerms(terms, "lauda", "lauda", "laudey", "laura", "lora", "lode");
+        addTerms(terms, "lulli", "lulli", "lully", "lullii");
+        addTerms(terms, "nunnu", "nunnu", "nunni", "nunoo");
+        addTerms(terms, "raand", "raand", "rand");
+        addTerms(terms, "suar", "suar", "suwar", "sooar", "suarni");
+        addTerms(terms, "tatti", "tatti", "tatty", "tattie");
+        addTerms(terms, "tatte", "tatte", "tattey", "tattee");
+        addTerms(terms, "fuddu", "fuddu", "fuddoo");
+        addTerms(terms, "chomu", "chomu", "chomoo", "chomuu");
+        addTerms(terms, "dhakkan", "dhakkan", "dhakan");
+        addTerms(terms, "ghonchu", "ghonchu", "ghonchoo", "ghonchuu");
+        addTerms(terms, "baklol", "baklol", "bakloll");
+        addTerms(terms, "nibba", "nibba", "nibbi", "nibbe", "nibbaa");
+
+        // Bengali/Banglish abuse frequently mixed into Romanized Indian chat.
+        addTerms(terms, "bokachoda", "bokachoda", "bokachodha", "bokachod",
+                "bokchod", "bokaachoda", "bokaachod");
+        addTerms(terms, "bokachodi", "bokachodi", "bokachudi", "bokachody", "bokachudii");
+        addTerms(terms, "abalchoda", "abalchoda", "abalchod", "abalchudha");
+        addTerms(terms, "paglachoda", "paglachoda", "paglachod", "paglachudha");
+        addTerms(terms, "paglichudi", "paglichudi", "paglichodi", "paglichudii");
+        addTerms(terms, "khanki", "khanki", "khaanki", "khankee");
+        addTerms(terms, "khankirpola", "khankirpola", "khankirpoa");
+        addTerms(terms, "magirpola", "magirpola", "magirpoa");
+        addTerms(terms, "chutmarani", "chutmarani", "chudmarani",
+                "chootmarani", "choodmarani");
+        addTerms(terms, "shuorerbaccha", "shuorerbaccha", "suorerbaccha", "shuorerbacha",
+                "suorerbacha", "shuorerbachcha");
+        addTerms(terms, "kuttarbacha", "kuttarbacha", "kuttarbaccha", "kuttarbachcha");
+        addTerms(terms, "bhodai", "bhodai", "vodai");
+        addTerms(terms, "balchoda", "balchoda", "balchod", "baalchoda");
+        addTerms(terms, "balmarka", "balmarka", "baalmarka");
+        addTerms(terms, "bhogchod", "bhogchod", "bhogchoda", "vogchod");
+        addTerms(terms, "murkhochoda", "murkhochoda", "murkhochod");
+        addTerms(terms, "bolodchoda", "bolodchoda", "bolodchod", "balodchoda");
+        addTerms(terms, "beyadob", "beyadob", "beadob", "beyadab");
+        addTerms(terms, "janowar", "janowar", "janoar", "janwar");
+        addTerms(terms, "shala", "shala", "shalaa");
         return Map.copyOf(terms);
     }
 

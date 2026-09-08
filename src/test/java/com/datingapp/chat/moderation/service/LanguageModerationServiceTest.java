@@ -43,6 +43,28 @@ class LanguageModerationServiceTest {
     }
 
     @Test
+    void detectsExpandedHindiAndHinglishSlang() {
+        assertTrue(service.analyze("bhadwaa kahi ka").flagged());
+        assertTrue(service.analyze("tu haramzada hai").flagged());
+        assertTrue(service.analyze("kya fattu aadmi hai").flagged());
+        assertTrue(service.analyze("jhatoo mat ban").flagged());
+        assertTrue(service.analyze("chomuu aur baklol").flagged());
+        assertTrue(service.analyze("suwar aur janwar").flagged());
+    }
+
+    @Test
+    void detectsBengaliAndBanglishSlangVariants() {
+        assertTrue(service.analyze("bokachoda").flagged());
+        assertTrue(service.analyze("boka choda").flagged());
+        assertTrue(service.analyze("bokachudi bondho kor").flagged());
+        assertTrue(service.analyze("abalchod").flagged());
+        assertTrue(service.analyze("khankir pola").flagged());
+        assertTrue(service.analyze("kuttar baccha").flagged());
+        assertTrue(service.analyze("shuorer bacha").flagged());
+        assertTrue(service.analyze("choodmarani").flagged());
+    }
+
+    @Test
     void detectsLeetspeakRepeatedLettersAndSeparatedLetters() {
         assertTrue(service.analyze("you are a b1tch").flagged());
         assertTrue(service.analyze("fuuuuuck this").flagged());
@@ -59,6 +81,8 @@ class LanguageModerationServiceTest {
         assertFalse(service.analyze("The beach is lovely and the witch story is classic.").flagged());
         assertFalse(service.analyze("She is passionate about assessment quality.").flagged());
         assertFalse(service.analyze("Where is the whole group meeting?").flagged());
+        assertFalse(service.analyze("Randy shared the charts and school assessment.").flagged());
+        assertFalse(service.analyze("The animal shelter has a puppy and a pig.").flagged());
     }
 
     @Test
