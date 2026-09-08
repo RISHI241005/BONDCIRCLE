@@ -14,7 +14,7 @@ A phone-number-first chat website built with **Java 21**, **Spring Boot 3.3.3**,
 - **Delivery & Read Receipts**: Realtime status transitions (`SENT` → `DELIVERED` → `READ`) with watermarked unread counters.
 - **Ephemeral Typing Indicators**: Broadcasts partner typing state without database overhead (`/app/chat.typing` → `/user/queue/typing`).
 - **Multi-Device Presence Tracking**: Tracks simultaneous device sessions per user (e.g. Android phone + iOS tablet) and maintains accurate `lastSeenAt` timestamps.
-- **English & Hinglish Language Warning**: Drafts with common abusive terms, spelling variants, leetspeak, or separated-letter obfuscation open an accessible pre-send warning; REST and WebSocket sends require an explicit override before flagged text is accepted.
+- **English & Hinglish Language Warning**: Drafts with common abusive terms, pronunciation-based spellings, typos, leetspeak, repeated letters, or separated-letter obfuscation open an accessible pre-send warning; REST and WebSocket sends require an explicit override before flagged text is accepted.
 - **Content Moderation & Safety**: Bi-directional blocking (`BlockService`) and conversation/message reporting (`ReportService`).
 - **Database Migrations (Flyway)**: Versioned schema evolution with zero reliance on `hibernate.ddl-auto=create`.
 - **OpenAPI 3.0 / Swagger UI**: Interactive API documentation at `/swagger-ui.html`.

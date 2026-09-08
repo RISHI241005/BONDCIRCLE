@@ -26,6 +26,23 @@ class LanguageModerationServiceTest {
     }
 
     @Test
+    void detectsPronunciationBasedSpellingsAndTypos() {
+        assertTrue(service.analyze("tu bevakuf hai").flagged());
+        assertTrue(service.analyze("what the phuck").flagged());
+        assertTrue(service.analyze("you idoit").flagged());
+        assertTrue(service.analyze("kitna kameenaa hai").flagged());
+        assertTrue(service.analyze("bh0sd1ke").flagged());
+    }
+
+    @Test
+    void detectsAdditionalEnglishAndHinglishAbuse() {
+        assertTrue(service.analyze("you scumbag").flagged());
+        assertTrue(service.analyze("nikamma kahi ka").flagged());
+        assertTrue(service.analyze("buddhoo mat bano").flagged());
+        assertTrue(service.analyze("what a chhapri").flagged());
+    }
+
+    @Test
     void detectsLeetspeakRepeatedLettersAndSeparatedLetters() {
         assertTrue(service.analyze("you are a b1tch").flagged());
         assertTrue(service.analyze("fuuuuuck this").flagged());
@@ -37,6 +54,11 @@ class LanguageModerationServiceTest {
         assertFalse(service.analyze("The assistant discussed class assignments.").flagged());
         assertFalse(service.analyze("Pagalpanti is a movie title").flagged());
         assertFalse(service.analyze("Let's meet at five near the station.").flagged());
+        ModerationResult officeSupplies = service.analyze("This batch of sheets is for the class.");
+        assertFalse(officeSupplies.flagged(), officeSupplies.matchedTerms().toString());
+        assertFalse(service.analyze("The beach is lovely and the witch story is classic.").flagged());
+        assertFalse(service.analyze("She is passionate about assessment quality.").flagged());
+        assertFalse(service.analyze("Where is the whole group meeting?").flagged());
     }
 
     @Test
