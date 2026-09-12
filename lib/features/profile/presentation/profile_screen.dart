@@ -4,6 +4,7 @@ import '../../../theme/bondcircle_theme.dart';
 import 'profile_setup_screen.dart';
 import '../../blind_bond/presentation/blind_bond_screen.dart';
 import '../../connections/presentation/connections_screen.dart';
+import '../../discover/presentation/discover_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -114,7 +115,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       selectedIndex: 3,
       onDestinationSelected: (index) {
         if (index == 0) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          DiscoverScreen.open(
+            context,
+            displayName: widget.displayName,
+            joinedCircles: widget.joinedCircles,
+          );
         } else if (index == 1) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute<void>(

@@ -4,6 +4,7 @@ import '../../../theme/bondcircle_theme.dart';
 import '../../blind_bond/presentation/blind_bond_screen.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../discover/presentation/discover_screen.dart';
 
 class ConnectionsScreen extends StatefulWidget {
   const ConnectionsScreen({
@@ -89,17 +90,24 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
           child: ListTile(
             key: const Key('openBlindConversation'),
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const BlindChatScreen()),
+              MaterialPageRoute<void>(
+                builder: (_) => BlindBondScreen(
+                  displayName: widget.displayName,
+                  joinedCircles: widget.joinedCircles,
+                ),
+              ),
             ),
             leading: const CircleAvatar(
               backgroundColor: BondCircleColors.purple,
               child: Icon(Icons.visibility_off_rounded, color: Colors.white),
             ),
             title: const Text(
-              'Purple Comet',
+              'Meet someone in your circle',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
-            subtitle: const Text('Identity hidden • Waiting for your reply'),
+            subtitle: const Text(
+              'Join a circle • Talk anonymously • Decide together',
+            ),
             trailing: const Icon(Icons.chevron_right_rounded),
           ),
         ),
@@ -144,7 +152,11 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
       selectedIndex: 2,
       onDestinationSelected: (index) {
         if (index == 0) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          DiscoverScreen.open(
+            context,
+            displayName: widget.displayName,
+            joinedCircles: widget.joinedCircles,
+          );
         } else if (index == 1) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute<void>(

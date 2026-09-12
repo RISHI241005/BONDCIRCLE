@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'features/auth/data/auth_api_service.dart';
 import 'features/auth/presentation/auth_screen.dart';
 import 'theme/bondcircle_theme.dart';
 
 class BondCircleApp extends StatelessWidget {
-  const BondCircleApp({super.key});
+  const BondCircleApp({super.key, this.authService});
+
+  final AuthApiService? authService;
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +15,7 @@ class BondCircleApp extends StatelessWidget {
       title: 'BondCircle',
       debugShowCheckedModeBanner: false,
       theme: BondCircleTheme.light,
-      home: const AuthScreen(),
+      home: AuthScreen(authService: authService),
     );
   }
 }

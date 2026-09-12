@@ -1,8 +1,29 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../../theme/bondcircle_theme.dart';
-import '../../connections/presentation/connections_screen.dart';
-import '../../profile/presentation/profile_screen.dart';
+import '../../chat/presentation/chat_screen.dart';
+
+/// Session-only demo data. No accounts, messages or consent leave the device.
+class BlindBondDemo {
+  static final matched = <String>{};
+  static final blocked = <String>{};
+  static final joined = <String>{};
+  static const circles = [
+    'Coffee Explorers',
+    'Gaming',
+    'Readers & Stories',
+    'Fitness',
+  ];
+  static String alias(String circle, int index) =>
+      '${circle.split(' ').first}Soul${27 + index}';
+  static List<String> eligible(String circle) => List.generate(
+    3,
+    (i) => alias(circle, i),
+  ).where((id) => !matched.contains(id) && !blocked.contains(id)).toList();
+}
 
 class BlindBondScreen extends StatefulWidget {
   const BlindBondScreen({
@@ -17,619 +38,712 @@ class BlindBondScreen extends StatefulWidget {
 }
 
 class _BlindBondScreenState extends State<BlindBondScreen> {
-  final _selected = <String>{};
-  static const _topics = [
-    'Deep conversations',
-    'Humour',
-    'Music',
-    'Books',
-    'Food',
-    'Travel',
-  ];
-
-  void _findBond() {
-    if (_selected.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Choose at least two conversation vibes.'),
-        ),
-      );
-      return;
-    }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => BlindMatchScreen(topics: _selected.toList()),
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    BlindBondDemo.joined.addAll(widget.joinedCircles);
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Blind Bond')),
     body: ListView(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+      padding: const EdgeInsets.all(20),
       children: [
-        Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF2D1B69), Color(0xFF8B4ED8)],
-            ),
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.visibility_off_rounded, color: Colors.white, size: 40),
-              SizedBox(height: 18),
-              Text(
-                'Meet the mind before the profile.',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 27,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              SizedBox(height: 10),
-              Text(
-                'Names, photos, profession and background stay hidden while you discover how the conversation feels.',
-                style: TextStyle(color: Colors.white70, height: 1.4),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'How it works',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: 12),
-        const _InfoRow(
-          Icons.tune_rounded,
-          'Choose your vibe',
-          'Pick conversation themes, not appearance.',
-        ),
-        const _InfoRow(
-          Icons.forum_outlined,
-          'Chat anonymously',
-          'Both people use aliases with no profile photo.',
-        ),
-        const _InfoRow(
-          Icons.lock_open_outlined,
-          'Reveal only together',
-          'Identity unlocks only if both choose to reveal.',
-        ),
-        const SizedBox(height: 22),
-        const Text(
-          'Your conversation vibes',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: 5),
-        const Text('Choose at least two.'),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _topics
-              .map(
-                (topic) => FilterChip(
-                  key: Key('blindTopic$topic'),
-                  selected: _selected.contains(topic),
-                  label: Text(topic),
-                  onSelected: (value) => setState(
-                    () =>
-                        value ? _selected.add(topic) : _selected.remove(topic),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: 26),
-        Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: BondCircleColors.lavender,
-            borderRadius: BorderRadius.circular(17),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.shield_outlined, color: BondCircleColors.purple),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Reporting and blocking remain available even while identities are hidden.',
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 22),
-        FilledButton.icon(
-          key: const Key('findBlindBondButton'),
-          onPressed: _findBond,
-          icon: const Icon(Icons.auto_awesome),
-          label: const Text('Find a Blind Bond'),
-        ),
-      ],
-    ),
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: 1,
-      onDestinationSelected: (index) {
-        if (index == 0) {
-          Navigator.of(context).pop();
-        } else if (index == 2) {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => ConnectionsScreen(
-                displayName: widget.displayName,
-                joinedCircles: widget.joinedCircles,
-              ),
-            ),
-          );
-        } else if (index == 3) {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => ProfileScreen(
-                displayName: widget.displayName,
-                joinedCircles: widget.joinedCircles,
-              ),
-            ),
-          );
-        }
-      },
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.explore_outlined),
-          label: 'Discover',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.visibility_off),
-          label: 'Blind Bond',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.chat_bubble_outline_rounded),
-          label: 'Chats',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.person_outline_rounded),
-          label: 'Profile',
-        ),
-      ],
-    ),
-  );
-}
-
-class BlindMatchScreen extends StatelessWidget {
-  const BlindMatchScreen({super.key, required this.topics});
-  final List<String> topics;
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Anonymous match')),
-    body: ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        const SizedBox(height: 28),
-        Container(
-          width: 120,
-          height: 120,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [Color(0xFF6D4DD6), Color(0xFFD94F76)],
-            ),
-          ),
-          child: const Icon(
-            Icons.question_mark_rounded,
-            color: Colors.white,
-            size: 60,
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'You found “Purple Comet”',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.displaySmall,
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'Their identity is hidden. You matched through conversation energy, not profile details.',
-          textAlign: TextAlign.center,
+        const _Hero(
+          title: 'A shared interest.\nA fresh connection.',
+          subtitle: 'Join a circle. Meet anonymously. Reveal only together.',
+          icon: Icons.diversity_1_outlined,
         ),
         const SizedBox(height: 20),
-        Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 8,
-          runSpacing: 8,
-          children: topics.map((topic) => Chip(label: Text(topic))).toList(),
-        ),
-        const SizedBox(height: 32),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            key: const Key('startBlindChatButton'),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const BlindChatScreen()),
-            ),
-            child: const Text('Start anonymous chat'),
+        const Text(
+          '01 JOIN  →  02 TALK  →  03 DECIDE',
+          style: TextStyle(
+            color: BondCircleColors.purple,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 10),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Maybe later'),
+        const SizedBox(height: 12),
+        const _DemoNotice(),
+        const SizedBox(height: 20),
+        Text(
+          'Choose your circle',
+          style: Theme.of(context).textTheme.headlineSmall,
         ),
+        const Text(
+          'Coffee, books, gaming or fitness — start with something you love.',
+        ),
+        const SizedBox(height: 12),
+        for (final circle in {
+          ...BlindBondDemo.circles,
+          ...widget.joinedCircles,
+        })
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    circle,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    BlindBondDemo.joined.contains(circle)
+                        ? 'Joined • Your circle is ready'
+                        : 'Meet people who share this interest',
+                  ),
+                  const SizedBox(height: 12),
+                  if (!BlindBondDemo.joined.contains(circle))
+                    OutlinedButton.icon(
+                      key: Key('blindJoin$circle'),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Join circle'),
+                      onPressed: () =>
+                          setState(() => BlindBondDemo.joined.add(circle)),
+                    )
+                  else
+                    FilledButton.icon(
+                      key: Key('enterBlind$circle'),
+                      icon: const Icon(Icons.visibility_off_outlined),
+                      label: const Text('Enter Blind Bond'),
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => BlindSessionScreen(circle: circle),
+                          ),
+                        );
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
       ],
     ),
   );
 }
 
-class BlindChatScreen extends StatefulWidget {
-  const BlindChatScreen({super.key});
-  @override
-  State<BlindChatScreen> createState() => _BlindChatScreenState();
+enum _Stage {
+  ready,
+  searching,
+  found,
+  chat,
+  voice,
+  decision,
+  waiting,
+  revealed,
+  ended,
+  empty,
 }
 
-class _BlindChatScreenState extends State<BlindChatScreen> {
-  final _controller = TextEditingController();
-  final _messages = <String>[
-    'What is one small thing that made you smile this week?',
-  ];
-  bool _requestedReveal = false;
-  int _promptIndex = 0;
-  static const _prompts = [
-    'What would your perfect slow Sunday look like?',
-    'Which song instantly improves your mood?',
-    'What quality do you value most in a person?',
-  ];
+class BlindSessionScreen extends StatefulWidget {
+  const BlindSessionScreen({
+    super.key,
+    required this.circle,
+    this.chatDuration = const Duration(minutes: 15),
+    this.voiceDuration = const Duration(minutes: 10),
+  });
+  final String circle;
+  final Duration chatDuration, voiceDuration;
+  @override
+  State<BlindSessionScreen> createState() => _BlindSessionScreenState();
+}
+
+class _BlindSessionScreenState extends State<BlindSessionScreen>
+    with WidgetsBindingObserver {
+  _Stage _stage = _Stage.ready;
+  Timer? _timer, _search;
+  DateTime? _deadline;
+  int _remaining = 0;
+  String _alias = '', _ending = '';
+  bool _muted = false, _speaker = false;
+  final _input = TextEditingController();
+  final _messages = <String>[];
+  bool get _active => _stage == _Stage.chat || _stage == _Stage.voice;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
   @override
   void dispose() {
-    _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    _search?.cancel();
+    _input.dispose();
     super.dispose();
   }
 
-  void _send() {
-    final value = _controller.text.trim();
-    if (value.isEmpty) return;
-    setState(() => _messages.add(value));
-    _controller.clear();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _active) _tick();
   }
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Purple Comet'),
-          Text(
-            'Identity hidden',
-            style: TextStyle(fontSize: 12, color: BondCircleColors.muted),
+  void _find() {
+    setState(() => _stage = _Stage.searching);
+    _search = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      final pool = BlindBondDemo.eligible(widget.circle);
+      setState(() {
+        if (pool.isEmpty) {
+          _stage = _Stage.empty;
+          return;
+        }
+        _alias = pool[Random().nextInt(pool.length)];
+        _stage = _Stage.found;
+      });
+    });
+  }
+
+  void _start(bool voice) {
+    final duration = voice ? widget.voiceDuration : widget.chatDuration;
+    _deadline = DateTime.now().add(duration);
+    setState(() {
+      _remaining = duration.inSeconds;
+      _stage = voice ? _Stage.voice : _Stage.chat;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  void _tick() {
+    if (!_active || !mounted) return;
+    final seconds =
+        (_deadline!.difference(DateTime.now()).inMilliseconds / 1000).ceil();
+    if (seconds <= 0) {
+      _decision();
+    } else {
+      setState(() => _remaining = seconds);
+    }
+  }
+
+  void _decision() {
+    _timer?.cancel();
+    _input.clear();
+    FocusScope.of(context).unfocus();
+    setState(() => _stage = _Stage.decision);
+  }
+
+  void _end(String message) {
+    _timer?.cancel();
+    _search?.cancel();
+    _input.clear();
+    _messages.clear();
+    setState(() {
+      _ending = message;
+      _stage = _Stage.ended;
+    });
+  }
+
+  void _send() {
+    _tick();
+    if (!_active || _input.text.trim().isEmpty) return;
+    final value = _input.text.trim();
+    // Basic demo guard only; not a comprehensive identity/content filter.
+    if (RegExp(r'@|https?://|www\.|\d{7,}').hasMatch(value)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Keep contact details and links out of this anonymous chat.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => _messages.add(value));
+    _input.clear();
+  }
+
+  Future<void> _leave() async {
+    if (_stage == _Stage.ready ||
+        _stage == _Stage.ended ||
+        _stage == _Stage.empty ||
+        _stage == _Stage.revealed) {
+      Navigator.pop(context);
+      return;
+    }
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Leave this Blind Bond?'),
+        content: const Text(
+          'This interaction will end without revealing either profile.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Stay'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Leave'),
           ),
         ],
       ),
-      actions: [
-        PopupMenuButton<String>(
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'report', child: Text('Report conversation')),
-            PopupMenuItem(value: 'block', child: Text('Block and leave')),
-          ],
-        ),
-      ],
-    ),
-    body: Column(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          color: BondCircleColors.lavender,
-          child: const Text(
-            'Anonymous chat • Avoid sharing personal contact or location details.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF4DE),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.lightbulb_outline_rounded),
-                const SizedBox(width: 10),
-                Expanded(child: Text(_prompts[_promptIndex])),
-                IconButton(
-                  key: const Key('nextBlindPromptButton'),
-                  tooltip: 'Next prompt',
-                  onPressed: () => setState(
-                    () => _promptIndex = (_promptIndex + 1) % _prompts.length,
-                  ),
-                  icon: const Icon(Icons.refresh_rounded),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(18),
-            itemCount: _messages.length,
-            itemBuilder: (_, index) {
-              final mine = index > 0;
-              return Align(
-                alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 15,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: mine ? BondCircleColors.primary : Colors.white,
-                    border: Border.all(
-                      color: mine
-                          ? BondCircleColors.primary
-                          : BondCircleColors.border,
-                    ),
-                    borderRadius: BorderRadius.circular(17),
-                  ),
-                  child: Text(
-                    _messages[index],
-                    style: TextStyle(
-                      color: mine ? Colors.white : BondCircleColors.ink,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: OutlinedButton.icon(
-            key: const Key('requestRevealButton'),
-            onPressed: () => setState(() => _requestedReveal = true),
-            icon: Icon(
-              _requestedReveal ? Icons.hourglass_top : Icons.lock_open_outlined,
-            ),
-            label: Text(
-              _requestedReveal
-                  ? 'Waiting for mutual consent'
-                  : 'Request mutual reveal',
-            ),
-          ),
-        ),
-        if (_requestedReveal)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 6),
-            child: Column(
-              children: [
-                const Text(
-                  'Your identity stays hidden until Purple Comet also agrees.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: BondCircleColors.muted),
-                ),
-                TextButton(
-                  key: const Key('previewMutualConsentButton'),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const MutualRevealScreen(),
-                    ),
-                  ),
-                  child: const Text('Preview mutual-consent result'),
-                ),
-              ],
-            ),
-          ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    key: const Key('blindChatField'),
-                    controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: 'Message anonymously…',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  key: const Key('sendBlindMessageButton'),
-                  onPressed: _send,
-                  icon: const Icon(Icons.send_rounded),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
+    );
+    if (leave == true && mounted) {
+      _end('You left the conversation. Both identities stayed private.');
+    }
+  }
+
+  Widget _button(String key, String label, VoidCallback action) => Padding(
+    padding: const EdgeInsets.only(top: 12),
+    child: FilledButton(key: Key(key), onPressed: action, child: Text(label)),
   );
-}
-
-class MutualRevealScreen extends StatefulWidget {
-  const MutualRevealScreen({super.key});
-  @override
-  State<MutualRevealScreen> createState() => _MutualRevealScreenState();
-}
-
-class _MutualRevealScreenState extends State<MutualRevealScreen> {
-  final bool _me = true;
-  bool _them = false;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Mutual reveal')),
-    body: ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        const SizedBox(height: 20),
-        const Icon(
-          Icons.lock_outline_rounded,
-          size: 64,
-          color: BondCircleColors.purple,
-        ),
-        const SizedBox(height: 18),
-        Text(
-          'Both people must say yes',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.displaySmall,
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'No identity information is shown while either person has not consented.',
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 28),
-        _ConsentTile(name: 'You', accepted: _me),
-        _ConsentTile(name: 'Purple Comet', accepted: _them),
-        const SizedBox(height: 28),
-        if (!_them)
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonal(
-              key: const Key('simulatePartnerConsentButton'),
-              onPressed: () => setState(() => _them = true),
-              child: const Text('Demo: Purple Comet agrees'),
-            ),
-          ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            key: const Key('completeMutualRevealButton'),
-            onPressed: _me && _them
-                ? () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const RevealedBondScreen(),
-                    ),
-                  )
-                : null,
-            child: const Text('Reveal identities'),
-          ),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Keep chatting anonymously'),
-        ),
-      ],
-    ),
+  Widget _title(String text) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 18),
+    child: Text(text, style: Theme.of(context).textTheme.headlineSmall),
   );
-}
+  String get _clock =>
+      '${(_remaining ~/ 60).toString().padLeft(2, '0')}:${(_remaining % 60).toString().padLeft(2, '0')} remaining';
 
-class _ConsentTile extends StatelessWidget {
-  const _ConsentTile({required this.name, required this.accepted});
-  final String name;
-  final bool accepted;
   @override
-  Widget build(BuildContext context) => Card(
-    child: ListTile(
-      leading: CircleAvatar(
-        child: Icon(
-          accepted ? Icons.check_rounded : Icons.hourglass_top_rounded,
+  Widget build(BuildContext context) => PopScope(
+    canPop: [
+      _Stage.ready,
+      _Stage.ended,
+      _Stage.empty,
+      _Stage.revealed,
+    ].contains(_stage),
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _leave();
+    },
+    child: Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          onPressed: _leave,
+          icon: const Icon(Icons.arrow_back),
         ),
+        title: const Text('Blind Bond'),
+        actions: [
+          if (_active || _stage == _Stage.found || _stage == _Stage.waiting)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                BlindBondDemo.blocked.add(_alias);
+                _end(
+                  value == 'report'
+                      ? 'Demo report recorded locally. Partner blocked for this app session; no report was sent.'
+                      : 'Partner blocked for this app session. Your identity stayed private.',
+                );
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'block', child: Text('Block and leave')),
+                PopupMenuItem(
+                  value: 'report',
+                  child: Text('Report and leave (demo)'),
+                ),
+              ],
+            ),
+        ],
       ),
-      title: Text(name, style: const TextStyle(fontWeight: FontWeight.w800)),
-      subtitle: Text(accepted ? 'Agreed to reveal' : 'Waiting for consent'),
-      trailing: Icon(
-        accepted ? Icons.verified_rounded : Icons.lock_outline,
-        color: accepted ? Colors.green : BondCircleColors.muted,
-      ),
-    ),
-  );
-}
-
-class RevealedBondScreen extends StatelessWidget {
-  const RevealedBondScreen({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Bond revealed')),
-    body: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 116,
-            height: 116,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [Color(0xFFE9A8B9), Color(0xFF9E6DD7)],
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.diversity_1_outlined,
+                    size: 18,
+                    color: BondCircleColors.purple,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.circle,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (_active)
+                    Text(
+                      _clock,
+                      key: const Key('blindCountdown'),
+                      style: const TextStyle(
+                        color: BondCircleColors.purple,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                ],
               ),
             ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Colors.white,
-              size: 62,
+            const Padding(padding: EdgeInsets.all(12), child: _DemoNotice()),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _content(),
+                ),
+              ),
             ),
+            if (_stage == _Stage.chat)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        key: const Key('blindChatField'),
+                        controller: _input,
+                        maxLength: 300,
+                        decoration: const InputDecoration(
+                          hintText: 'Message anonymously…',
+                          counterText: '',
+                        ),
+                        onSubmitted: (_) => _send(),
+                      ),
+                    ),
+                    IconButton.filled(
+                      key: const Key('sendBlindMessageButton'),
+                      onPressed: _send,
+                      icon: const Icon(Icons.send),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  List<Widget> _content() {
+    switch (_stage) {
+      case _Stage.ready:
+        return [
+          const _Hero(
+            title: 'Your circle.\nSomeone new.',
+            subtitle: 'A little curiosity can start something meaningful.',
+            icon: Icons.local_cafe_outlined,
+          ),
+          _title('How your Blind Bond works'),
+          const Text(
+            '1. Find an unmatched member of this circle.\n\n2. Talk anonymously: 15-min chat or 10-min voice demo.\n\n3. Decide independently. Only two yeses unlock profiles.',
+          ),
+          const SizedBox(height: 18),
+          const _Privacy(),
+          _button('findBlindBondButton', 'Find an anonymous partner', _find),
+        ];
+      case _Stage.searching:
+        return [
+          _title('Finding someone in your circle…'),
+          const Center(
+            child: Icon(Icons.radar, size: 80, color: BondCircleColors.purple),
           ),
           const SizedBox(height: 24),
-          Text(
-            'Purple Comet is Aarohi',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.displaySmall,
+          const Text(
+            'Selecting randomly from eligible demo members. Existing demo matches and blocked partners are excluded.',
+          ),
+          TextButton(
+            onPressed: () {
+              _search?.cancel();
+              setState(() => _stage = _Stage.ready);
+            },
+            child: const Text('Cancel search'),
+          ),
+        ];
+      case _Stage.empty:
+        return [
+          _title('No new partners right now'),
+          const Text(
+            'All demo partners in this circle are matched or blocked. Try another circle.',
+          ),
+          _button(
+            'returnToCircles',
+            'Back to circles',
+            () => Navigator.pop(context),
+          ),
+        ];
+      case _Stage.found:
+        return [
+          _Hero(
+            title: 'Partner found!',
+            subtitle: 'Say hello to $_alias.',
+            icon: Icons.auto_awesome,
+          ),
+          _title('You have something in common'),
+          Wrap(
+            spacing: 8,
+            children: [
+              widget.circle,
+              'Travel',
+              'Music',
+            ].map((s) => Chip(label: Text(s))).toList(),
+          ),
+          const Text('Shared interests shown here are sample data.'),
+          const SizedBox(height: 18),
+          const _Privacy(),
+          _button(
+            'startBlindChatButton',
+            'Start chat • 15 minutes',
+            () => _start(false),
+          ),
+          _button(
+            'startBlindVoiceButton',
+            'Start voice demo • 10 minutes',
+            () => _start(true),
           ),
           const SizedBox(height: 10),
           const Text(
-            'You both chose to reveal. Only now are the name and profile preview visible.',
-            textAlign: TextAlign.center,
+            'Voice is a UI simulation. No microphone access, recording or live call.',
           ),
-          const SizedBox(height: 24),
-          const Wrap(
-            spacing: 8,
-            children: [
-              Chip(label: Text('Coffee')),
-              Chip(label: Text('Music')),
-              Chip(label: Text('Books')),
-            ],
+        ];
+      case _Stage.chat:
+      case _Stage.voice:
+        return [
+          _title(_alias),
+          const _Privacy(),
+          const SizedBox(height: 16),
+          if (_stage == _Stage.voice) ...[
+            const _Hero(
+              title: 'Anonymous voice',
+              subtitle: 'Simulated call • No audio transmitted',
+              icon: Icons.graphic_eq,
+            ),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              children: [
+                FilterChip(
+                  label: Text(_muted ? 'Muted (demo)' : 'Mute (demo)'),
+                  selected: _muted,
+                  onSelected: (v) => setState(() => _muted = v),
+                ),
+                FilterChip(
+                  label: Text(
+                    _speaker ? 'Speaker on (demo)' : 'Speaker (demo)',
+                  ),
+                  selected: _speaker,
+                  onSelected: (v) => setState(() => _speaker = v),
+                ),
+              ],
+            ),
+          ] else ...[
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Icebreaker: What would your perfect slow Sunday look like?',
+                ),
+              ),
+            ),
+            const Text(
+              'Sample partner: A new café, a good book and no alarms. What about you?',
+            ),
+            for (final message in _messages)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Card(
+                  color: BondCircleColors.lavender,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Text(message),
+                  ),
+                ),
+              ),
+          ],
+          _button(
+            'endBlindInteraction',
+            'End conversation & decide',
+            _decision,
           ),
-          const SizedBox(height: 28),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Continue conversation'),
+          TextButton(
+            key: const Key('demoExpire'),
+            onPressed: _decision,
+            child: const Text('Demo: jump to time limit'),
+          ),
+        ];
+      case _Stage.decision:
+        return [
+          const _Hero(
+            title: 'Did you feel\na connection?',
+            subtitle: 'Your choice is yours. There is no pressure to reveal.',
+            icon: Icons.favorite_outline,
+          ),
+          _title('Conversation finished'),
+          const Text(
+            'The anonymous session has ended. Your profile remains hidden unless both of you choose to connect.',
+          ),
+          _button(
+            'requestRevealButton',
+            'Reveal my profile / Connect',
+            () => setState(() => _stage = _Stage.waiting),
+          ),
+          TextButton(
+            key: const Key('declineBlindBond'),
+            onPressed: () =>
+                _end('No connection made. Both identities stayed private.'),
+            child: const Text('Stay anonymous / Not interested'),
+          ),
+        ];
+      case _Stage.waiting:
+        return [
+          const _Hero(
+            title: 'Your profile\nis still private.',
+            subtitle: 'Waiting for the other person’s independent decision.',
+            icon: Icons.lock_outline,
+          ),
+          _title('You chose to connect'),
+          const Text(
+            'One yes is not enough. You can withdraw before a mutual reveal.',
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'PRESENTATION CONTROLS • Simulate the other person',
+            style: TextStyle(
+              color: BondCircleColors.purple,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ],
+          _button(
+            'simulatePartnerConsentButton',
+            'Demo: partner chooses Reveal',
+            () {
+              BlindBondDemo.matched.add(_alias);
+              setState(() => _stage = _Stage.revealed);
+            },
+          ),
+          _button(
+            'simulatePartnerDeclineButton',
+            'Demo: partner declines',
+            () => _end(
+              'No mutual connection this time. Both identities stayed private.',
+            ),
+          ),
+          TextButton(
+            key: const Key('withdrawReveal'),
+            onPressed: () => _end(
+              'You withdrew your choice. Your profile was not revealed.',
+            ),
+            child: const Text('Withdraw & stay anonymous'),
+          ),
+        ];
+      case _Stage.revealed:
+        return [
+          const _Hero(
+            title: 'It’s mutual!',
+            subtitle:
+                'You both chose to connect. Your profiles are now unlocked.',
+            icon: Icons.celebration_outlined,
+          ),
+          _title('$_alias is Aarohi'),
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 38,
+                    child: Icon(Icons.person_outline, size: 40),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Aarohi, 24',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Demo profile • Coffee lover, reader and weekend explorer.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          _button(
+            'continueRevealedChat',
+            'Match & open normal chat',
+            () => Navigator.of(context).pushReplacement(
+              MaterialPageRoute<void>(
+                builder: (_) => ChatScreen(
+                  matchName: 'Aarohi',
+                  sharedCircle: widget.circle,
+                ),
+              ),
+            ),
+          ),
+        ];
+      case _Stage.ended:
+        return [
+          _Hero(
+            title: 'Private,\njust as promised.',
+            subtitle: _ending,
+            icon: Icons.shield_outlined,
+          ),
+          _button(
+            'returnToCircles',
+            'Back to circles',
+            () => Navigator.pop(context),
+          ),
+        ];
+    }
+  }
+}
+
+class _DemoNotice extends StatelessWidget {
+  const _DemoNotice();
+  @override
+  Widget build(BuildContext context) => const Text(
+    'FRONTEND DEMO • Sample partners. No live chat or calls. Data resets when the app restarts.',
+    style: TextStyle(fontSize: 12, color: BondCircleColors.muted),
+  );
+}
+
+class _Privacy extends StatelessWidget {
+  const _Privacy();
+  @override
+  Widget build(BuildContext context) => const Card(
+    color: BondCircleColors.lavender,
+    child: Padding(
+      padding: EdgeInsets.all(14),
+      child: Text(
+        'Identity hidden • No names, photos or profiles are shown. Please do not share your name, contact details, location or other private information.',
       ),
     ),
   );
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow(this.icon, this.title, this.subtitle);
-  final IconData icon;
+class _Hero extends StatelessWidget {
+  const _Hero({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
   final String title, subtitle;
+  final IconData icon;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 14),
-    child: Row(
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(28),
+      gradient: const LinearGradient(
+        colors: [Color(0xFF2D1B69), Color(0xFF7547B9)],
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: BondCircleColors.lavender,
-            borderRadius: BorderRadius.circular(13),
+        Icon(icon, size: 38, color: const Color(0xFFE6D6FF)),
+        const SizedBox(height: 20),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 30,
+            height: 1.15,
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
           ),
-          child: Icon(icon, color: BondCircleColors.purple),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-              Text(subtitle),
-            ],
-          ),
+        const SizedBox(height: 12),
+        Text(
+          subtitle,
+          style: const TextStyle(color: Colors.white, height: 1.5),
         ),
       ],
     ),

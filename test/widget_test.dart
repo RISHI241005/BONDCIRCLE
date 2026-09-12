@@ -1,4 +1,6 @@
 import 'package:bondcircle/app.dart';
+import 'package:bondcircle/features/auth/data/auth_api_service.dart';
+import 'package:bondcircle/features/auth/domain/auth_user.dart';
 import 'package:bondcircle/features/profile/presentation/profile_setup_screen.dart';
 import 'package:bondcircle/features/circles/presentation/interest_circles_screen.dart';
 import 'package:bondcircle/features/discover/presentation/discover_screen.dart';
@@ -27,17 +29,17 @@ void main() {
 
   testWidgets('validates empty login form', (tester) async {
     await tester.pumpWidget(const BondCircleApp());
+    await tester.ensureVisible(find.byKey(const Key('continueButton')));
     await tester.tap(find.byKey(const Key('continueButton')));
     await tester.pump();
     expect(find.text('Enter a valid email address'), findsOneWidget);
-    expect(
-      find.text('Password must have at least 6 characters'),
-      findsOneWidget,
-    );
+    expect(find.text('Password must have at least 8 characters'), findsOneWidget);
+    expect(find.byKey(const Key('passwordField')), findsOneWidget);
   });
 
   testWidgets('sign in and sign up open different flows', (tester) async {
-    await tester.pumpWidget(const BondCircleApp());
+    final authService = MockAuthApiService();
+    await tester.pumpWidget(BondCircleApp(authService: authService));
     await tester.enterText(
       find.byKey(const Key('emailField')),
       'sagar@example.com',
@@ -51,10 +53,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('People in your circles'), findsOneWidget);
     expect(find.text('Create profile'), findsNothing);
+    expect(find.byKey(const Key('authCodeField')), findsNothing);
 
-    await tester.pumpWidget(BondCircleApp(key: UniqueKey()));
+    await tester.pumpWidget(BondCircleApp(key: UniqueKey(), authService: authService));
     await tester.tap(find.byKey(const Key('signupTab')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('nameField')), 'New User');
     await tester.enterText(
       find.byKey(const Key('emailField')),
@@ -64,11 +67,23 @@ void main() {
       find.byKey(const Key('passwordField')),
       'password123',
     );
+    await tester.enterText(
+      find.byKey(const Key('confirmPasswordField')),
+      'different123',
+    );
     await tester.ensureVisible(find.byKey(const Key('continueButton')));
     await tester.tap(find.byKey(const Key('continueButton')));
     await tester.pumpAndSettle();
-    expect(find.text('Create profile'), findsOneWidget);
-    expect(find.text('People in your circles'), findsNothing);
+    expect(find.text('Passwords do not match'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('confirmPasswordField')),
+      'password123',
+    );
+    await tester.ensureVisible(find.byKey(const Key('continueButton')));
+    await tester.tap(find.byKey(const Key('continueButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Account created successfully! Please sign in.'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
   });
 
   testWidgets('profile setup validates required details', (tester) async {
@@ -259,9 +274,7 @@ void main() {
     );
   });
 
-  testWidgets('blind bond requires topics and opens anonymous match', (
-    tester,
-  ) async {
+  testWidgets('blind bond joins circle and opens session', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: BlindBondScreen(
@@ -271,39 +284,40 @@ void main() {
       ),
     );
     await tester.scrollUntilVisible(
-      find.byKey(const Key('findBlindBondButton')),
-      300,
+      find.byKey(const Key('blindJoinGaming')),
+      200,
     );
-    await tester.tap(find.byKey(const Key('findBlindBondButton')));
+    await tester.tap(find.byKey(const Key('blindJoinGaming')));
     await tester.pump();
-    expect(
-      find.text('Choose at least two conversation vibes.'),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const Key('blindTopicMusic')));
-    await tester.tap(find.byKey(const Key('blindTopicBooks')));
-    await tester.tap(find.byKey(const Key('findBlindBondButton')));
+    await tester.tap(find.byKey(const Key('enterBlindGaming')));
     await tester.pumpAndSettle();
-    expect(find.text('You found “Purple Comet”'), findsOneWidget);
-    expect(find.byKey(const Key('startBlindChatButton')), findsOneWidget);
+    expect(find.text('Gaming'), findsOneWidget);
+    expect(find.byKey(const Key('findBlindBondButton')), findsOneWidget);
   });
 
   testWidgets('blind reveal requires mutual consent', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: BlindChatScreen()));
-    await tester.tap(find.byKey(const Key('requestRevealButton')));
-    await tester.pump();
-    expect(find.text('Waiting for mutual consent'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('previewMutualConsentButton')));
-    await tester.pumpAndSettle();
-    final revealButton = tester.widget<FilledButton>(
-      find.byKey(const Key('completeMutualRevealButton')),
+    await tester.pumpWidget(
+      const MaterialApp(home: BlindSessionScreen(circle: 'Coffee Explorers')),
     );
-    expect(revealButton.onPressed, isNull);
-    await tester.tap(find.byKey(const Key('simulatePartnerConsentButton')));
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('completeMutualRevealButton')));
+    Future<void> tap(String key) async {
+      await tester.ensureVisible(find.byKey(Key(key)));
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
+
+    await tap('findBlindBondButton');
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
-    expect(find.text('Purple Comet is Aarohi'), findsOneWidget);
+    await tap('startBlindChatButton');
+    expect(find.text('15:00 remaining'), findsOneWidget);
+    await tap('endBlindInteraction');
+    await tap('requestRevealButton');
+    expect(find.textContaining('is Aarohi'), findsNothing);
+    expect(find.byKey(const Key('continueRevealedChat')), findsNothing);
+    await tap('simulatePartnerConsentButton');
+    expect(find.text('It’s mutual!'), findsOneWidget);
+    await tap('continueRevealedChat');
+    expect(find.byKey(const Key('chatMessageField')), findsOneWidget);
   });
 
   testWidgets('connections can be searched and opened', (tester) async {
@@ -358,4 +372,49 @@ void main() {
     expect(find.text('Your profile'), findsOneWidget);
     expect(find.text('Profile strength'), findsOneWidget);
   });
+}
+
+Future<void> verifyAuthCode(WidgetTester tester) async {
+  expect(find.byKey(const Key('passwordField')), findsNothing);
+  await tester.ensureVisible(find.byKey(const Key('continueButton')));
+  await tester.tap(find.byKey(const Key('continueButton')));
+  await tester.pumpAndSettle();
+  expect(find.byKey(const Key('passwordField')), findsNothing);
+  final code = tester
+      .widget<Text>(find.byKey(const Key('demoAuthCode')))
+      .data!
+      .split(': ')
+      .last;
+  await tester.enterText(find.byKey(const Key('authCodeField')), code);
+  await tester.ensureVisible(find.byKey(const Key('continueButton')));
+  await tester.tap(find.byKey(const Key('continueButton')));
+  await tester.pumpAndSettle();
+}
+
+class MockAuthApiService extends AuthApiService {
+  @override
+  Future<AuthResult> signIn({
+    required String email,
+    required String password,
+  }) async {
+    if (email == 'sagar@example.com' && password == 'password123') {
+      return AuthResult.success(
+        token: 'mock_jwt_token',
+        user: const AuthUser(id: 1, name: 'Sagar', email: 'sagar@example.com'),
+      );
+    }
+    return AuthResult.failure('Invalid email or password.');
+  }
+
+  @override
+  Future<AuthResult> signUp({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    return AuthResult.success(
+      user: AuthUser(id: 2, name: name, email: email),
+      message: 'Account created successfully! Please sign in.',
+    );
+  }
 }

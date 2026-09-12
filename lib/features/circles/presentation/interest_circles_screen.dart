@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/bondcircle_theme.dart';
 import '../../discover/presentation/discover_screen.dart';
+import '../../blind_bond/presentation/blind_bond_screen.dart';
 
 class InterestCirclesScreen extends StatefulWidget {
   const InterestCirclesScreen({super.key, required this.displayName});
@@ -29,6 +30,23 @@ class _InterestCirclesScreenState extends State<InterestCirclesScreen> {
       members: 284,
       icon: Icons.local_cafe_rounded,
       colors: [Color(0xFF7A4B36), Color(0xFFD89A6A)],
+    ),
+    _Circle(
+      name: 'Gaming',
+      description:
+          'Co-op adventures, favourite games and friendly competition.',
+      category: 'Social',
+      members: 120,
+      icon: Icons.sports_esports_outlined,
+      colors: [Color(0xFF4056A1), Color(0xFF7D91DC)],
+    ),
+    _Circle(
+      name: 'Fitness',
+      description: 'Share your favourite workouts and active routines.',
+      category: 'Active',
+      members: 180,
+      icon: Icons.fitness_center,
+      colors: [Color(0xFF2E7257), Color(0xFF6EBE8D)],
     ),
     _Circle(
       name: 'Readers & Stories',
@@ -213,10 +231,21 @@ class _InterestCirclesScreenState extends State<InterestCirclesScreen> {
                           return _CircleCard(
                             circle: circle,
                             joined: _joined.contains(circle.name),
+                            onEnter: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    BlindSessionScreen(circle: circle.name),
+                              ),
+                            ),
                             onToggle: () => setState(() {
                               _joined.contains(circle.name)
                                   ? _joined.remove(circle.name)
                                   : _joined.add(circle.name);
+                              if (_joined.contains(circle.name)) {
+                                BlindBondDemo.joined.add(circle.name);
+                              } else {
+                                BlindBondDemo.joined.remove(circle.name);
+                              }
                             }),
                           );
                         },
@@ -253,11 +282,13 @@ class _CircleCard extends StatelessWidget {
     required this.circle,
     required this.joined,
     required this.onToggle,
+    required this.onEnter,
   });
 
   final _Circle circle;
   final bool joined;
   final VoidCallback onToggle;
+  final VoidCallback onEnter;
 
   @override
   Widget build(BuildContext context) {
@@ -312,6 +343,13 @@ class _CircleCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (joined)
+                  TextButton.icon(
+                    key: Key('circleBlind${circle.name}'),
+                    onPressed: onEnter,
+                    icon: const Icon(Icons.visibility_off_outlined),
+                    label: const Text('Enter Blind Bond'),
+                  ),
               ],
             ),
           ),
@@ -385,6 +423,9 @@ class _CirclesCompleteScreen extends StatelessWidget {
                 key: const Key('goToDiscoverButton'),
                 onPressed: () => Navigator.of(context).pushReplacement(
                   MaterialPageRoute<void>(
+                    settings: const RouteSettings(
+                      name: DiscoverScreen.routeName,
+                    ),
                     builder: (_) => DiscoverScreen(
                       displayName: displayName,
                       joinedCircles: circles,
