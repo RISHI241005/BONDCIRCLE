@@ -78,7 +78,7 @@ class InterestBasedIceBreakerServiceTest {
 
         assertEquals("NEW_CONVERSATION", response.context());
         assertEquals(List.of("Travel"), response.sharedInterests());
-        assertEquals(12, response.suggestions().size());
+        assertEquals(4, response.suggestions().size());
         assertTrue(response.suggestions().stream().anyMatch(value -> value.text().contains("Travel")));
         assertTrue(response.circles().stream().anyMatch(value -> value.code().equals("COMMON_GROUND")));
 
@@ -155,18 +155,21 @@ class InterestBasedIceBreakerServiceTest {
                 moderationService,
                 new IceBreakerProperties(),
                 new AiAssistantProperties(),
-                request -> Optional.of(new LiveConversationAssistant.ReplyBatch(
-                        "Acknowledge their day and invite an easy next detail.",
-                        List.of(new LiveConversationAssistant.Reply(
-                                "Oh no, hectic kyun tha? Ab thoda relax kar pa rahe ho?",
-                                "Their day",
-                                "Responds directly and naturally.",
-                                "DIRECT_REPLY",
-                                "WARM",
-                                "HINGLISH")))));
+                request -> {
+                    assertEquals(7, request.variation());
+                    return Optional.of(new LiveConversationAssistant.ReplyBatch(
+                            "Acknowledge their day and invite an easy next detail.",
+                            List.of(new LiveConversationAssistant.Reply(
+                                    "Oh no, hectic kyun tha? Ab thoda relax kar pa rahe ho?",
+                                    "Their day",
+                                    "Responds directly and naturally.",
+                                    "DIRECT_REPLY",
+                                    "WARM",
+                                    "HINGLISH"))));
+                });
 
         IceBreakerResponse response = service.getSuggestions(
-                "conversation-44", 1L, 4, "ALL", 0, "HINGLISH", "WRITE_FOR_ME");
+                "conversation-44", 1L, 4, "ALL", 7, "HINGLISH", "WRITE_FOR_ME");
 
         assertTrue(response.generatedLive());
         assertEquals("LIVE_AI", response.source());

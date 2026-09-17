@@ -8,8 +8,8 @@ import org.springframework.context.annotation.Configuration;
 public class IceBreakerProperties {
 
     private int historyLookback = 80;
-    private int defaultSuggestions = 12;
-    private int maxSuggestions = 20;
+    private int defaultSuggestions = 4;
+    private int maxSuggestions = 6;
     private int quietAfterHours = 6;
 
     public int getHistoryLookback() {

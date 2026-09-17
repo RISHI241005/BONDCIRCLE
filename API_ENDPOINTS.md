@@ -47,7 +47,7 @@
 | PUT | `/api/v1/users/me/interests` | Yes | `{ "interests": ["Travel", "Music"] }` | `{ success: true, data: { interests: String[] } }` | 400, 401 | Replace the authenticated user's interests (maximum 10) |
 | GET | `/api/v1/chats/{conversationId}/ice-breakers` | Yes | - | `{ success: true, data: { conversationId, context, guidance, sharedInterests, priorTopics, circles, suggestions, source, language, mode, generatedLive } }` | 401, 403, 404 | Generate fresh AI replies from chat history and interests, with a deterministic fallback |
 
-Query parameters:
+Optional API parameters (the browser chooses these automatically):
 
 - `limit`: 1–20 replies.
 - `tone`: `ALL`, `CURIOUS`, `WARM`, `PLAYFUL`, or `THOUGHTFUL`.
@@ -55,7 +55,7 @@ Query parameters:
 - `mode`: `SUGGEST`, `WRITE_FOR_ME`, or `AUTOPILOT`.
 - `variant`: requests a fresh variation and controls fallback ordering.
 
-`generatedLive` distinguishes provider-generated replies from the offline Circle fallback. `AUTOPILOT` returns one ready-to-send draft; the browser only sends it when the user has explicitly enabled auto-reply for that open chat.
+The browser requests four suggestions with automatic language and tone detection. `variant` is incremented by the Refresh button so the assistant explores a different conversational angle. `generatedLive` distinguishes provider-generated replies from the reliable offline Circle fallback.
 
 ### Presence
 

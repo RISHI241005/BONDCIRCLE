@@ -1,6 +1,6 @@
 # BondCircle Live AI Conversation Assistant
 
-BondCircle generates new English or Hinglish replies from the active conversation, both profiles' interests, the requested tone, and the selected assistant mode. The five-circle model still tells the AI how closely each reply should connect to the conversation.
+BondCircle presents four simple English or Hinglish reply suggestions based on the active conversation and both profiles' interests. There are no language, tone, circle, or mode controls in the chat: the assistant infers what feels natural from the conversation. The five-circle model works quietly in the background.
 
 ## The five circles
 
@@ -16,7 +16,7 @@ Each live result includes its circle, tone, language, explanation, topic, and re
 
 The service reads the latest configurable message window, removes deleted messages, labels messages as `ME` or `THEM`, and combines the history with both profiles' interests. Conversation text is sent as untrusted quoted data, provider storage is disabled in the request, and the API key remains server-side.
 
-If the provider is not configured or temporarily fails, the deterministic Circle engine supplies offline suggestions. Auto-reply refuses to send fallback text, so automation only runs when live generation succeeds.
+If the provider is not configured or temporarily fails, the deterministic Circle engine supplies offline suggestions. Suggestions are always drafts: tapping one places it in the composer so the user can review or edit it before sending.
 
 Configuration lives under `chat.icebreaker`:
 
@@ -24,8 +24,8 @@ Configuration lives under `chat.icebreaker`:
 chat:
   icebreaker:
     history-lookback: 80
-    default-suggestions: 12
-    max-suggestions: 20
+    default-suggestions: 4
+    max-suggestions: 6
     quiet-after-hours: 6
   ai-assistant:
     enabled: true
@@ -33,19 +33,19 @@ chat:
     base-url: https://ai-gateway.vercel.sh/v1
     model: openai/gpt-5.4-mini
     history-messages: 40
-    max-suggestions: 12
+    max-suggestions: 6
 ```
 
 On Vercel, the automatically injected `VERCEL_OIDC_TOKEN` authenticates the AI Gateway without storing another key. Elsewhere, set `AI_GATEWAY_API_KEY` or `AI_ASSISTANT_API_KEY`. All AI settings can be overridden with `AI_ASSISTANT_*` environment variables, including an alternate OpenResponses-compatible base URL and model.
 
 ## API
 
-`GET /api/v1/chats/{conversationId}/ice-breakers?limit=12&tone=ALL&language=AUTO&mode=SUGGEST&variant=0`
+`GET /api/v1/chats/{conversationId}/ice-breakers?limit=4&variant=0`
 
 - `limit`: requested result count, clamped to the configured maximum.
 - `tone`: `ALL`, `CURIOUS`, `WARM`, `PLAYFUL`, or `THOUGHTFUL`.
 - `language`: `AUTO`, `ENGLISH`, or `HINGLISH`.
 - `mode`: `SUGGEST`, `WRITE_FOR_ME`, or `AUTOPILOT`.
-- `variant`: changes ordering within similarly relevant drafts and powers the refresh button.
+- `variant`: asks the AI for a noticeably different angle and powers the Refresh button.
 
-Only authenticated conversation participants can request replies. Suggestions and write-for-me drafts remain editable. Auto-reply is off by default, scoped to the currently open chat, and sends at most one live AI reply after a new incoming message.
+Only authenticated conversation participants can request replies. The browser automatically uses `AUTO` language, `ALL` tone, and suggestion mode. Advanced API parameters remain available for backward compatibility, but they are not exposed in the chat interface.

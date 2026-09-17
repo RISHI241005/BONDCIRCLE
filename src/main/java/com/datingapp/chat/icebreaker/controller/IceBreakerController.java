@@ -32,7 +32,7 @@ public class IceBreakerController {
     @Operation(summary = "Generate live conversation replies", description = "Uses the configured AI provider to create private English or Hinglish drafts from recent chat history and interests, with a deterministic fallback when AI is unavailable.")
     public ResponseEntity<ApiResponse<IceBreakerResponse>> getSuggestions(
             @PathVariable String conversationId,
-            @RequestParam(defaultValue = "12") int limit,
+            @RequestParam(defaultValue = "4") int limit,
             @RequestParam(defaultValue = "ALL") String tone,
             @RequestParam(defaultValue = "0") int variant,
             @RequestParam(defaultValue = "AUTO") String language,

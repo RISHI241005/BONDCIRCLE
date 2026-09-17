@@ -21,9 +21,6 @@ const state = {
     coachLoadedFor: new Set(),
     coachResponse: null,
     coachVariant: 0,
-    autoReplyFor: new Set(),
-    autoReplyHandled: new Set(),
-    autoReplyRequest: 0,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -231,9 +228,6 @@ function logout(notify = true) {
     state.coachLoadedFor.clear();
     state.coachResponse = null;
     state.coachVariant = 0;
-    state.autoReplyFor.clear();
-    state.autoReplyHandled.clear();
-    state.autoReplyRequest += 1;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(PROFILE_KEY);
     chatView.hidden = true;
@@ -324,7 +318,6 @@ async function openConversation(conversation, moveToChat = true) {
     $("messageList").textContent = "";
     state.coachResponse = null;
     state.coachVariant = 0;
-    $("aiAutoReply").checked = state.autoReplyFor.has(state.activeId);
     closeIceBreakers();
 
     try {
@@ -420,7 +413,7 @@ function maybeSurfaceIceBreakers(messages) {
     loadIceBreakers(true);
 }
 
-async function loadIceBreakers(automatic = false, modeOverride = null) {
+async function loadIceBreakers(automatic = false) {
     const conversationId = state.activeId;
     if (!conversationId) return;
     const panel = $("iceBreakerPanel");
@@ -433,14 +426,9 @@ async function loadIceBreakers(automatic = false, modeOverride = null) {
     loading.textContent = "Reading the conversation and writing fresh replies…";
     suggestions.appendChild(loading);
     try {
-        const language = $("assistantLanguage").value;
-        const mode = modeOverride || $("assistantMode").value;
-        const limit = mode === "AUTOPILOT" ? 1 : 12;
         const params = new URLSearchParams({
-            limit: String(limit),
+            limit: "4",
             variant: String(state.coachVariant),
-            language,
-            mode,
         });
         const response = await api(`/chats/${encodeURIComponent(conversationId)}/ice-breakers?${params}`);
         if (state.activeId !== conversationId) return;
@@ -457,62 +445,26 @@ function renderIceBreakers(response) {
     panel.classList.toggle("is-live", Boolean(response?.generatedLive));
     panel.classList.toggle("is-fallback", !response?.generatedLive);
     $("iceBreakerGuidance").textContent = response?.guidance || "Choose a reply that sounds like you.";
-    const circleFilter = $("iceBreakerCircleFilter");
-    const selectedCircle = circleFilter.value;
-    circleFilter.textContent = "";
-    const allOption = document.createElement("option");
-    allOption.value = "ALL";
-    allOption.textContent = "All circles";
-    circleFilter.appendChild(allOption);
-    for (const circle of response?.circles || []) {
-        const option = document.createElement("option");
-        option.value = circle.code;
-        option.textContent = circle.label;
-        circleFilter.appendChild(option);
-    }
-    circleFilter.value = [...circleFilter.options].some((option) => option.value === selectedCircle) ? selectedCircle : "ALL";
-    renderFilteredIceBreakers();
-    if (response?.generatedLive && response?.mode === "WRITE_FOR_ME" && response.suggestions?.[0]?.text) {
-        $("messageInput").value = response.suggestions[0].text;
-        resizeComposer();
-        showToast("AI wrote a draft. Review it before sending.");
-    }
-}
-
-function renderFilteredIceBreakers() {
     const container = $("iceBreakerSuggestions");
     container.textContent = "";
-    const circle = $("iceBreakerCircleFilter").value;
-    const tone = $("iceBreakerToneFilter").value;
-    const visibleSuggestions = (state.coachResponse?.suggestions || []).filter((suggestion) =>
-        (circle === "ALL" || suggestion.circle === circle) &&
-        (tone === "ALL" || suggestion.tone === tone));
-    if (!visibleSuggestions.length) {
+    const suggestions = response?.suggestions || [];
+    if (!suggestions.length) {
         const empty = document.createElement("p");
         empty.className = "coach-loading";
-        empty.textContent = "No ideas match these filters. Try another circle or tone.";
+        empty.textContent = "No suggestion is available right now. Please refresh and try again.";
         container.appendChild(empty);
         return;
     }
-    for (const suggestion of visibleSuggestions) {
+    for (const suggestion of suggestions) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "coach-suggestion";
         button.title = suggestion.reason || "Use this suggestion";
-        const meta = document.createElement("div");
-        meta.className = "coach-suggestion-meta";
-        const circleLabel = document.createElement("span");
-        circleLabel.textContent = suggestion.circleLabel || suggestion.topic || "Conversation idea";
-        const toneLabel = document.createElement("span");
-        toneLabel.textContent = String(suggestion.tone || "").toLowerCase();
-        const languageLabel = document.createElement("span");
-        languageLabel.textContent = String(suggestion.language || "English").toLowerCase();
-        meta.append(circleLabel, toneLabel, languageLabel);
         const text = document.createElement("strong");
         text.textContent = suggestion.text;
-        const reason = document.createElement("small");
-        reason.textContent = suggestion.reason || "";
-        button.append(meta, text, reason);
+        const hint = document.createElement("small");
+        hint.textContent = `Tap to use · ${suggestion.language === "HINGLISH" ? "Hinglish" : "English"}`;
+        button.append(text, hint);
         button.addEventListener("click", () => {
             $("messageInput").value = suggestion.text;
             resizeComposer();
@@ -521,73 +473,6 @@ function renderFilteredIceBreakers() {
         });
         container.appendChild(button);
     }
-}
-
-function toggleAutoReply() {
-    if (!state.activeId) {
-        $("aiAutoReply").checked = false;
-        return;
-    }
-    if ($("aiAutoReply").checked) {
-        state.autoReplyFor.add(state.activeId);
-        showToast("AI auto-reply is on for this open chat.");
-        const messages = state.messages.get(state.activeId) || [];
-        const latest = messages[messages.length - 1];
-        if (latest && Number(latest.senderId) !== Number(state.profile?.userId)) {
-            scheduleAutoReply(latest);
-        }
-    } else {
-        state.autoReplyFor.delete(state.activeId);
-        state.autoReplyRequest += 1;
-        showToast("AI auto-reply is off.");
-    }
-}
-
-function scheduleAutoReply(message) {
-    const conversationId = message?.conversationId || state.activeId;
-    const messageId = message?.id;
-    if (!conversationId || !messageId
-            || conversationId !== state.activeId
-            || !state.autoReplyFor.has(conversationId)
-            || state.autoReplyHandled.has(messageId)
-            || Number(message.senderId) === Number(state.profile?.userId)) return;
-
-    state.autoReplyHandled.add(messageId);
-    const requestId = ++state.autoReplyRequest;
-    setTimeout(async () => {
-        if (requestId !== state.autoReplyRequest
-                || conversationId !== state.activeId
-                || !state.autoReplyFor.has(conversationId)) return;
-        const messages = state.messages.get(conversationId) || [];
-        const latest = messages[messages.length - 1];
-        if (!latest || Number(latest.senderId) === Number(state.profile?.userId)) return;
-        try {
-            const params = new URLSearchParams({
-                limit: "1",
-                variant: String(Date.now()),
-                language: $("assistantLanguage").value,
-                mode: "AUTOPILOT",
-            });
-            const response = await api(`/chats/${encodeURIComponent(conversationId)}/ice-breakers?${params}`);
-            if (requestId !== state.autoReplyRequest
-                    || conversationId !== state.activeId
-                    || !state.autoReplyFor.has(conversationId)) return;
-            const current = state.messages.get(conversationId) || [];
-            const currentLatest = current[current.length - 1];
-            if (!currentLatest || Number(currentLatest.senderId) === Number(state.profile?.userId)) return;
-            if (!response?.generatedLive) {
-                state.autoReplyFor.delete(conversationId);
-                $("aiAutoReply").checked = false;
-                throw new Error("Live AI is not configured, so auto-reply was switched off.");
-            }
-            const reply = response.suggestions?.[0]?.text?.trim();
-            if (!reply) throw new Error("AI could not create a safe reply.");
-            await performSend(reply, false);
-            showToast("AI sent a reply for you.");
-        } catch (err) {
-            showToast(err.message, "error");
-        }
-    }, 1400);
 }
 
 function closeIceBreakers() {
@@ -926,7 +811,6 @@ function handleRealtimeEvent(event) {
             sendApplicationMessage("/app/chat.delivered", { conversationId: data.conversationId, messageId: data.id });
             if (data.conversationId === state.activeId) {
                 sendApplicationMessage("/app/chat.read", { conversationId: data.conversationId, messageId: data.id });
-                scheduleAutoReply(data);
             }
         }
     } else if (event?.eventType === "MESSAGE_STATUS_UPDATE" && data) {
@@ -1032,15 +916,6 @@ $("refreshIceBreakers").addEventListener("click", () => {
     loadIceBreakers(false);
 });
 $("closeIceBreakers").addEventListener("click", closeIceBreakers);
-$("iceBreakerCircleFilter").addEventListener("change", renderFilteredIceBreakers);
-$("iceBreakerToneFilter").addEventListener("change", renderFilteredIceBreakers);
-$("assistantLanguage").addEventListener("change", () => {
-    if (!$("iceBreakerPanel").hidden) loadIceBreakers(false);
-});
-$("assistantMode").addEventListener("change", () => {
-    if (!$("iceBreakerPanel").hidden) loadIceBreakers(false);
-});
-$("aiAutoReply").addEventListener("change", toggleAutoReply);
 $("interestsButton").addEventListener("click", openInterests);
 $("interestsClose").addEventListener("click", closeInterests);
 $("interestsForm").addEventListener("submit", saveInterests);

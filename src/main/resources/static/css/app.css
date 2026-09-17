@@ -164,22 +164,15 @@ button { cursor: pointer; }
 .coach-heading p { margin: .18rem 0 0; color: var(--muted); font-size: .7rem; }
 .coach-actions { display: flex; gap: .3rem; }
 .coach-actions button { display: grid; place-items: center; width: 29px; height: 29px; border: 0; border-radius: 8px; color: #69708a; background: #e9ebfa; font-size: 1rem; }
-.coach-filters { display: flex; flex-wrap: wrap; gap: .55rem; margin: 0 0 .65rem; }
-.coach-filters label { display: flex; align-items: center; gap: .35rem; color: #777e94; font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
-.coach-filters select { min-height: 30px; padding: 0 1.7rem 0 .55rem; border: 1px solid #dfe2f5; border-radius: 8px; color: #424a68; background: white; font-size: .7rem; text-transform: none; letter-spacing: 0; }
-.coach-filters .coach-auto { min-height: 30px; padding: 0 .62rem; border: 1px solid #dfe2f5; border-radius: 8px; color: #4f5bd5; background: white; text-transform: none; letter-spacing: 0; cursor: pointer; }
-.coach-auto input { accent-color: var(--blue); }
-.coach-privacy { margin: -.28rem 0 .68rem; color: #8a90a5; font-size: .64rem; line-height: 1.4; }
+.coach-actions .coach-refresh { width: auto; padding: 0 .65rem; font-size: .68rem; font-weight: 800; }
+.coach-privacy { margin: 0 0 .68rem; color: #8a90a5; font-size: .66rem; line-height: 1.4; }
 .coach-panel.is-live { border-top-color: #cfd5ff; background: linear-gradient(135deg, #f8f9ff, #f3f8ff); }
 .coach-panel.is-fallback .coach-heading strong::after { content: "Offline"; margin-left: .45rem; padding: .12rem .34rem; border-radius: 999px; color: #8a672f; background: #fff2ce; font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; }
 .coach-suggestions { display: flex; gap: .55rem; overflow-x: auto; padding-bottom: .1rem; }
 .coach-suggestion { min-width: min(270px, 80vw); padding: .72rem .8rem; border: 1px solid #dde0fb; border-radius: 12px; color: #323950; background: white; text-align: left; box-shadow: 0 4px 13px rgba(37,49,105,.05); }
 .coach-suggestion:hover { border-color: #aeb6ff; transform: translateY(-1px); }
-.coach-suggestion-meta { display: flex; align-items: center; gap: .35rem; margin-bottom: .38rem; }
-.coach-suggestion span { display: inline-block; padding: .16rem .35rem; border-radius: 999px; color: #5965ce; background: #f0f2ff; font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
-.coach-suggestion span + span { color: #7b658d; background: #f8f1fa; }
 .coach-suggestion strong { display: block; font-size: .78rem; line-height: 1.45; }
-.coach-suggestion small { display: block; margin-top: .4rem; color: #8c92a5; font-size: .66rem; line-height: 1.35; }
+.coach-suggestion small { display: block; margin-top: .45rem; color: #737b9c; font-size: .62rem; font-weight: 700; }
 .coach-loading { color: var(--muted); font-size: .76rem; }
 .composer { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: .7rem; padding: .85rem 1rem; border-top: 1px solid var(--line); background: white; }
 .composer textarea { width: 100%; min-height: 48px; max-height: 140px; resize: none; padding: .78rem 5.2rem .78rem 1rem; border: 1px solid var(--line); border-radius: 15px; outline: 0; line-height: 1.45; }

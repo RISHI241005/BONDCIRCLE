@@ -18,6 +18,7 @@ public interface LiveConversationAssistant {
             String tone,
             String mode,
             int count,
+            int variation,
             List<String> myInterests,
             List<String> theirInterests,
             List<ConversationTurn> history) {

@@ -159,6 +159,7 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                         tone,
                         mode,
                         safeLimit,
+                        variant,
                         currentUser,
                         otherUser,
                         recentMessages));
@@ -218,6 +219,7 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             String tone,
             String mode,
             int count,
+            int variation,
             User currentUser,
             User otherUser,
             List<Message> recentMessages) {
@@ -240,6 +242,7 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 tone,
                 mode,
                 requestedCount,
+                variation,
                 currentUser.getInterestList(),
                 otherUser.getInterestList(),
                 history);

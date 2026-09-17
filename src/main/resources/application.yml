@@ -49,8 +49,8 @@ chat:
     max-page-size: 100
   icebreaker:
     history-lookback: ${ICEBREAKER_HISTORY_LOOKBACK:80}
-    default-suggestions: ${ICEBREAKER_DEFAULT_SUGGESTIONS:12}
-    max-suggestions: ${ICEBREAKER_MAX_SUGGESTIONS:20}
+    default-suggestions: ${ICEBREAKER_DEFAULT_SUGGESTIONS:4}
+    max-suggestions: ${ICEBREAKER_MAX_SUGGESTIONS:6}
     quiet-after-hours: ${ICEBREAKER_QUIET_AFTER_HOURS:6}
   ai-assistant:
     enabled: ${AI_ASSISTANT_ENABLED:true}
