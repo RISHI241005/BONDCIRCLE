@@ -9,6 +9,10 @@ public record IceBreakerResponse(
         List<String> sharedInterests,
         List<String> priorTopics,
         List<IceBreakerCircle> circles,
-        List<IceBreakerSuggestion> suggestions
+        List<IceBreakerSuggestion> suggestions,
+        String source,
+        String language,
+        String mode,
+        boolean generatedLive
 ) {
 }

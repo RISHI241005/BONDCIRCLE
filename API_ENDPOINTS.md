@@ -45,9 +45,17 @@
 | METHOD | URL | AUTH | REQUEST BODY | RESPONSE | ERROR RESPONSES | PURPOSE |
 |---|---|---|---|---|---|---|
 | PUT | `/api/v1/users/me/interests` | Yes | `{ "interests": ["Travel", "Music"] }` | `{ success: true, data: { interests: String[] } }` | 400, 401 | Replace the authenticated user's interests (maximum 10) |
-| GET | `/api/v1/chats/{conversationId}/ice-breakers` | Yes | - | `{ success: true, data: { conversationId, context, guidance, sharedInterests, priorTopics, circles, suggestions } }` | 401, 403, 404 | Return ranked private drafts based on prior chat topics and interests. Supports `limit` (1–20), `tone`, and `variant` query parameters |
+| GET | `/api/v1/chats/{conversationId}/ice-breakers` | Yes | - | `{ success: true, data: { conversationId, context, guidance, sharedInterests, priorTopics, circles, suggestions, source, language, mode, generatedLive } }` | 401, 403, 404 | Generate fresh AI replies from chat history and interests, with a deterministic fallback |
 
-Ice-breaker suggestions are drafts only. The client places a selected suggestion in the composer so the user can edit and deliberately send it. Supported tones are `ALL`, `CURIOUS`, `WARM`, `PLAYFUL`, and `THOUGHTFUL`.
+Query parameters:
+
+- `limit`: 1–20 replies.
+- `tone`: `ALL`, `CURIOUS`, `WARM`, `PLAYFUL`, or `THOUGHTFUL`.
+- `language`: `AUTO`, `ENGLISH`, or `HINGLISH`.
+- `mode`: `SUGGEST`, `WRITE_FOR_ME`, or `AUTOPILOT`.
+- `variant`: requests a fresh variation and controls fallback ordering.
+
+`generatedLive` distinguishes provider-generated replies from the offline Circle fallback. `AUTOPILOT` returns one ready-to-send draft; the browser only sends it when the user has explicitly enabled auto-reply for that open chat.
 
 ### Presence
 

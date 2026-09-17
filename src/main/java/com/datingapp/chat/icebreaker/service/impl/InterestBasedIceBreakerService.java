@@ -3,6 +3,7 @@ package com.datingapp.chat.icebreaker.service.impl;
 import com.datingapp.chat.common.exception.ErrorCode;
 import com.datingapp.chat.common.exception.ForbiddenException;
 import com.datingapp.chat.common.exception.ResourceNotFoundException;
+import com.datingapp.chat.config.AiAssistantProperties;
 import com.datingapp.chat.config.IceBreakerProperties;
 import com.datingapp.chat.conversation.entity.Conversation;
 import com.datingapp.chat.conversation.repository.ConversationParticipantRepository;
@@ -13,6 +14,7 @@ import com.datingapp.chat.icebreaker.dto.IceBreakerSuggestion;
 import com.datingapp.chat.icebreaker.service.ConversationCircleRulesEngine;
 import com.datingapp.chat.icebreaker.service.ConversationSignalExtractor;
 import com.datingapp.chat.icebreaker.service.IceBreakerService;
+import com.datingapp.chat.icebreaker.service.LiveConversationAssistant;
 import com.datingapp.chat.message.entity.Message;
 import com.datingapp.chat.message.repository.MessageRepository;
 import com.datingapp.chat.moderation.service.LanguageModerationService;
@@ -30,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -37,6 +40,8 @@ import java.util.function.Predicate;
 public class InterestBasedIceBreakerService implements IceBreakerService {
 
     private static final Set<String> TONES = Set.of("ALL", "CURIOUS", "WARM", "PLAYFUL", "THOUGHTFUL");
+    private static final Set<String> LANGUAGES = Set.of("AUTO", "ENGLISH", "HINGLISH");
+    private static final Set<String> MODES = Set.of("SUGGEST", "WRITE_FOR_ME", "AUTOPILOT");
 
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
@@ -46,6 +51,8 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
     private final ConversationSignalExtractor signalExtractor;
     private final LanguageModerationService moderationService;
     private final IceBreakerProperties properties;
+    private final AiAssistantProperties aiProperties;
+    private final LiveConversationAssistant liveAssistant;
 
     public InterestBasedIceBreakerService(
             ConversationRepository conversationRepository,
@@ -55,7 +62,9 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             ConversationCircleRulesEngine circleRules,
             ConversationSignalExtractor signalExtractor,
             LanguageModerationService moderationService,
-            IceBreakerProperties properties) {
+            IceBreakerProperties properties,
+            AiAssistantProperties aiProperties,
+            LiveConversationAssistant liveAssistant) {
         this.conversationRepository = conversationRepository;
         this.participantRepository = participantRepository;
         this.messageRepository = messageRepository;
@@ -64,6 +73,8 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         this.signalExtractor = signalExtractor;
         this.moderationService = moderationService;
         this.properties = properties;
+        this.aiProperties = aiProperties;
+        this.liveAssistant = liveAssistant;
     }
 
     @Override
@@ -73,7 +84,9 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 userId,
                 properties.getDefaultSuggestions(),
                 "ALL",
-                0);
+                0,
+                "AUTO",
+                "SUGGEST");
     }
 
     @Override
@@ -84,6 +97,19 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             int limit,
             String requestedTone,
             int variant) {
+        return getSuggestions(conversationId, userId, limit, requestedTone, variant, "AUTO", "SUGGEST");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public IceBreakerResponse getSuggestions(
+            String conversationId,
+            Long userId,
+            int limit,
+            String requestedTone,
+            int variant,
+            String requestedLanguage,
+            String requestedMode) {
         Conversation conversation = conversationRepository.findByPublicId(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Conversation not found: " + conversationId, ErrorCode.CONVERSATION_NOT_FOUND));
@@ -120,41 +146,170 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 userId,
                 allKnownInterests);
 
+        int safeLimit = Math.max(1, Math.min(limit, properties.getMaxSuggestions()));
+        String tone = normalizeTone(requestedTone);
+        String language = normalizeLanguage(requestedLanguage);
+        String mode = normalizeMode(requestedMode);
+        Optional<LiveConversationAssistant.ReplyBatch> liveBatch = liveAssistant.generate(
+                buildLiveRequest(
+                        conversationId,
+                        userId,
+                        context,
+                        language,
+                        tone,
+                        mode,
+                        safeLimit,
+                        currentUser,
+                        otherUser,
+                        recentMessages));
+        if (liveBatch.isPresent()) {
+            List<IceBreakerSuggestion> liveSuggestions = mapLiveSuggestions(
+                    liveBatch.get().replies(), tone, safeLimit);
+            if (!liveSuggestions.isEmpty()) {
+                return response(
+                        conversationId,
+                        context,
+                        liveBatch.get().guidance(),
+                        sharedInterests,
+                        signals.priorTopics(),
+                        liveSuggestions,
+                        "LIVE_AI",
+                        language,
+                        mode,
+                        true);
+            }
+        }
+
         List<IceBreakerSuggestion> pool = buildSuggestionPool(
                 context,
                 currentUser.getInterestList(),
                 otherUser.getInterestList(),
                 sharedInterests,
                 signals);
-        String tone = normalizeTone(requestedTone);
         Predicate<IceBreakerSuggestion> toneFilter = suggestion ->
                 tone.equals("ALL") || suggestion.tone().equals(tone);
         List<IceBreakerSuggestion> eligible = deduplicate(pool).stream()
                 .filter(toneFilter)
                 .filter(suggestion -> !moderationService.analyze(suggestion.text()).flagged())
                 .toList();
-        int safeLimit = Math.max(1, Math.min(limit, properties.getMaxSuggestions()));
         List<IceBreakerSuggestion> selected = selectAcrossCircles(
                 eligible,
                 safeLimit,
                 conversationId,
                 variant);
-        Set<String> includedCircles = selected.stream()
+        return response(
+                conversationId,
+                context,
+                guidanceFor(context) + " Live AI is not configured or temporarily unavailable, so these are offline suggestions.",
+                sharedInterests,
+                signals.priorTopics(),
+                selected,
+                "RULES",
+                language,
+                mode,
+                false);
+    }
+
+    private LiveConversationAssistant.GenerationRequest buildLiveRequest(
+            String conversationId,
+            Long userId,
+            String context,
+            String language,
+            String tone,
+            String mode,
+            int count,
+            User currentUser,
+            User otherUser,
+            List<Message> recentMessages) {
+        int historyLimit = Math.max(1, aiProperties.getHistoryMessages());
+        List<LiveConversationAssistant.ConversationTurn> history = recentMessages.stream()
+                .limit(historyLimit)
+                .toList()
+                .reversed()
+                .stream()
+                .map(message -> new LiveConversationAssistant.ConversationTurn(
+                        message.getSenderId().equals(userId) ? "ME" : "THEM",
+                        truncate(message.getContent(), 600)))
+                .toList();
+        int requestedCount = mode.equals("AUTOPILOT") ? 1 : count;
+        return new LiveConversationAssistant.GenerationRequest(
+                userId,
+                conversationId,
+                context,
+                language,
+                tone,
+                mode,
+                requestedCount,
+                currentUser.getInterestList(),
+                otherUser.getInterestList(),
+                history);
+    }
+
+    private List<IceBreakerSuggestion> mapLiveSuggestions(
+            List<LiveConversationAssistant.Reply> replies,
+            String requestedTone,
+            int limit) {
+        Map<String, IceBreakerSuggestion> unique = new LinkedHashMap<>();
+        int rank = 0;
+        for (LiveConversationAssistant.Reply reply : replies) {
+            String text = truncate(reply.text(), 500).trim();
+            String tone = normalizeGeneratedTone(reply.tone());
+            if (text.isBlank()
+                    || (!requestedTone.equals("ALL") && !requestedTone.equals(tone))
+                    || moderationService.analyze(text).flagged()) {
+                continue;
+            }
+            String circle = circleRules.all().stream().anyMatch(rule -> rule.code().equals(reply.circle()))
+                    ? reply.circle()
+                    : "LIGHT_TOUCH";
+            ConversationCircleRulesEngine.CircleRule rule = circleRules.get(circle);
+            unique.putIfAbsent(text.toLowerCase(Locale.ROOT), new IceBreakerSuggestion(
+                    text,
+                    truncate(reply.topic(), 80),
+                    truncate(reply.reason(), 180),
+                    circle,
+                    rule.label(),
+                    tone,
+                    Math.max(70, 100 - rank++),
+                    normalizeGeneratedLanguage(reply.language()),
+                    true));
+            if (unique.size() >= limit) {
+                break;
+            }
+        }
+        return List.copyOf(unique.values());
+    }
+
+    private IceBreakerResponse response(
+            String conversationId,
+            String context,
+            String guidance,
+            List<String> sharedInterests,
+            List<String> priorTopics,
+            List<IceBreakerSuggestion> suggestions,
+            String source,
+            String language,
+            String mode,
+            boolean generatedLive) {
+        Set<String> includedCircles = suggestions.stream()
                 .map(IceBreakerSuggestion::circle)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         List<IceBreakerCircle> availableCircles = circleRules.all().stream()
                 .filter(rule -> includedCircles.contains(rule.code()))
                 .map(ConversationCircleRulesEngine.CircleRule::toResponse)
                 .toList();
-
         return new IceBreakerResponse(
                 conversationId,
                 context,
-                guidanceFor(context),
+                guidance,
                 sharedInterests,
-                signals.priorTopics(),
+                priorTopics,
                 availableCircles,
-                selected);
+                suggestions,
+                source,
+                language,
+                mode,
+                generatedLive);
     }
 
     private String detectContext(List<Message> messages) {
@@ -390,6 +545,36 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
     private String normalizeTone(String requestedTone) {
         String tone = requestedTone == null ? "ALL" : requestedTone.trim().toUpperCase(Locale.ROOT);
         return TONES.contains(tone) ? tone : "ALL";
+    }
+
+    private String normalizeLanguage(String requestedLanguage) {
+        String language = requestedLanguage == null
+                ? "AUTO"
+                : requestedLanguage.trim().toUpperCase(Locale.ROOT);
+        return LANGUAGES.contains(language) ? language : "AUTO";
+    }
+
+    private String normalizeMode(String requestedMode) {
+        String mode = requestedMode == null ? "SUGGEST" : requestedMode.trim().toUpperCase(Locale.ROOT);
+        return MODES.contains(mode) ? mode : "SUGGEST";
+    }
+
+    private String normalizeGeneratedTone(String value) {
+        String tone = normalizeTone(value);
+        return tone.equals("ALL") ? "WARM" : tone;
+    }
+
+    private String normalizeGeneratedLanguage(String value) {
+        String language = normalizeLanguage(value);
+        return language.equals("AUTO") ? "ENGLISH" : language;
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        String clean = value.trim().replaceAll("\\s+", " ");
+        return clean.length() <= maxLength ? clean : clean.substring(0, maxLength);
     }
 
     private String displayTopic(String value) {

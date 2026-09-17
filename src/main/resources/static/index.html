@@ -107,19 +107,23 @@
                         <button id="mobileBackButton" class="icon-button mobile-back" type="button" aria-label="Back to chats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
                         <div id="chatAvatar" class="avatar">?</div>
                         <div class="conversation-person"><strong id="chatName">Conversation</strong><span id="chatPresence">Offline</span></div>
-                        <button id="iceBreakerButton" class="coach-button" type="button" aria-expanded="false" aria-controls="iceBreakerPanel" title="Get conversation ideas"><span aria-hidden="true">✦</span> Ideas</button>
+                        <button id="iceBreakerButton" class="coach-button" type="button" aria-expanded="false" aria-controls="iceBreakerPanel" title="Open your live AI conversation assistant"><span aria-hidden="true">✦</span> AI Help</button>
                         <div class="secure-note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Private chat</div>
                     </header>
                     <div id="messageList" class="message-list" aria-live="polite" aria-label="Messages"></div>
                     <section id="iceBreakerPanel" class="coach-panel" aria-label="Conversation ideas" hidden>
                         <div class="coach-heading">
-                            <div><strong>Circle suggestions</strong><p id="iceBreakerGuidance">Pick an idea to add it to your message.</p></div>
+                            <div><strong>Live AI conversation assistant</strong><p id="iceBreakerGuidance">Generate a reply from this chat and your interests.</p></div>
                             <div class="coach-actions"><button id="refreshIceBreakers" type="button" title="Refresh ideas" aria-label="Refresh ideas">↻</button><button id="closeIceBreakers" type="button" title="Close ideas" aria-label="Close ideas">×</button></div>
                         </div>
                         <div class="coach-filters">
+                            <label>Language<select id="assistantLanguage"><option value="AUTO">Match chat</option><option value="ENGLISH">English</option><option value="HINGLISH">Hinglish</option></select></label>
+                            <label>Mode<select id="assistantMode"><option value="SUGGEST">Suggestions</option><option value="WRITE_FOR_ME">Write for me</option></select></label>
                             <label>Circle<select id="iceBreakerCircleFilter"><option value="ALL">All circles</option></select></label>
                             <label>Tone<select id="iceBreakerToneFilter"><option value="ALL">All tones</option><option value="CURIOUS">Curious</option><option value="WARM">Warm</option><option value="PLAYFUL">Playful</option><option value="THOUGHTFUL">Thoughtful</option></select></label>
+                            <label class="coach-auto"><input id="aiAutoReply" type="checkbox"> Auto-reply while open</label>
                         </div>
+                        <p class="coach-privacy">AI uses recent messages and interests to generate private drafts. Auto-reply sends only after you enable it for this chat.</p>
                         <div id="iceBreakerSuggestions" class="coach-suggestions"></div>
                     </section>
                     <div id="typingIndicator" class="typing" hidden><span></span><span></span><span></span><em>typing</em></div>

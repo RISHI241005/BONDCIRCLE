@@ -6,4 +6,13 @@ public interface IceBreakerService {
     IceBreakerResponse getSuggestions(String conversationId, Long userId);
 
     IceBreakerResponse getSuggestions(String conversationId, Long userId, int limit, String tone, int variant);
+
+    IceBreakerResponse getSuggestions(
+            String conversationId,
+            Long userId,
+            int limit,
+            String tone,
+            int variant,
+            String language,
+            String mode);
 }

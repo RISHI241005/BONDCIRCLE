@@ -167,6 +167,11 @@ button { cursor: pointer; }
 .coach-filters { display: flex; flex-wrap: wrap; gap: .55rem; margin: 0 0 .65rem; }
 .coach-filters label { display: flex; align-items: center; gap: .35rem; color: #777e94; font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .coach-filters select { min-height: 30px; padding: 0 1.7rem 0 .55rem; border: 1px solid #dfe2f5; border-radius: 8px; color: #424a68; background: white; font-size: .7rem; text-transform: none; letter-spacing: 0; }
+.coach-filters .coach-auto { min-height: 30px; padding: 0 .62rem; border: 1px solid #dfe2f5; border-radius: 8px; color: #4f5bd5; background: white; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.coach-auto input { accent-color: var(--blue); }
+.coach-privacy { margin: -.28rem 0 .68rem; color: #8a90a5; font-size: .64rem; line-height: 1.4; }
+.coach-panel.is-live { border-top-color: #cfd5ff; background: linear-gradient(135deg, #f8f9ff, #f3f8ff); }
+.coach-panel.is-fallback .coach-heading strong::after { content: "Offline"; margin-left: .45rem; padding: .12rem .34rem; border-radius: 999px; color: #8a672f; background: #fff2ce; font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; }
 .coach-suggestions { display: flex; gap: .55rem; overflow-x: auto; padding-bottom: .1rem; }
 .coach-suggestion { min-width: min(270px, 80vw); padding: .72rem .8rem; border: 1px solid #dde0fb; border-radius: 12px; color: #323950; background: white; text-align: left; box-shadow: 0 4px 13px rgba(37,49,105,.05); }
 .coach-suggestion:hover { border-color: #aeb6ff; transform: translateY(-1px); }

@@ -1,6 +1,7 @@
 package com.datingapp.chat.icebreaker.service;
 
 import com.datingapp.chat.common.exception.ForbiddenException;
+import com.datingapp.chat.config.AiAssistantProperties;
 import com.datingapp.chat.config.IceBreakerProperties;
 import com.datingapp.chat.conversation.entity.Conversation;
 import com.datingapp.chat.conversation.repository.ConversationParticipantRepository;
@@ -53,7 +54,9 @@ class InterestBasedIceBreakerServiceTest {
                 new ConversationCircleRulesEngine(),
                 new ConversationSignalExtractor(moderationService),
                 moderationService,
-                new IceBreakerProperties());
+                new IceBreakerProperties(),
+                new AiAssistantProperties(),
+                request -> Optional.empty());
     }
 
     @Test
@@ -123,6 +126,53 @@ class InterestBasedIceBreakerServiceTest {
         when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 99L)).thenReturn(false);
 
         assertThrows(ForbiddenException.class, () -> service.getSuggestions("conversation-44", 99L));
+    }
+
+    @Test
+    void returnsFreshHinglishRepliesFromLiveAssistant() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Photography"));
+        Message latest = message(2L, "Aaj ka din kaafi hectic tha", Instant.now());
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(latest));
+
+        LanguageModerationService moderationService = new LanguageModerationService();
+        service = new InterestBasedIceBreakerService(
+                conversationRepository,
+                participantRepository,
+                messageRepository,
+                userRepository,
+                new ConversationCircleRulesEngine(),
+                new ConversationSignalExtractor(moderationService),
+                moderationService,
+                new IceBreakerProperties(),
+                new AiAssistantProperties(),
+                request -> Optional.of(new LiveConversationAssistant.ReplyBatch(
+                        "Acknowledge their day and invite an easy next detail.",
+                        List.of(new LiveConversationAssistant.Reply(
+                                "Oh no, hectic kyun tha? Ab thoda relax kar pa rahe ho?",
+                                "Their day",
+                                "Responds directly and naturally.",
+                                "DIRECT_REPLY",
+                                "WARM",
+                                "HINGLISH")))));
+
+        IceBreakerResponse response = service.getSuggestions(
+                "conversation-44", 1L, 4, "ALL", 0, "HINGLISH", "WRITE_FOR_ME");
+
+        assertTrue(response.generatedLive());
+        assertEquals("LIVE_AI", response.source());
+        assertEquals("HINGLISH", response.suggestions().getFirst().language());
+        assertTrue(response.suggestions().getFirst().aiGenerated());
+        assertTrue(response.suggestions().getFirst().text().contains("kyun"));
     }
 
     private User user(Long id, String name, List<String> interests) {
