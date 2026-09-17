@@ -41,7 +41,7 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
 
     private static final Set<String> TONES = Set.of("ALL", "CURIOUS", "WARM", "PLAYFUL", "THOUGHTFUL");
     private static final Set<String> LANGUAGES = Set.of("AUTO", "ENGLISH", "HINGLISH");
-    private static final Set<String> MODES = Set.of("SUGGEST", "WRITE_FOR_ME", "AUTOPILOT");
+    private static final Set<String> MODES = Set.of("SUGGEST", "WRITE_FOR_ME", "AUTOPILOT", "UNABLE_TO_TALK");
 
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
@@ -167,26 +167,34 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             List<IceBreakerSuggestion> liveSuggestions = mapLiveSuggestions(
                     liveBatch.get().replies(), tone, safeLimit);
             if (!liveSuggestions.isEmpty()) {
+                LiveConversationAssistant.ReplyBatch batch = liveBatch.get();
                 return response(
                         conversationId,
                         context,
-                        liveBatch.get().guidance(),
+                        batch.guidance(),
                         sharedInterests,
                         signals.priorTopics(),
                         liveSuggestions,
                         "LIVE_AI",
                         language,
                         mode,
-                        true);
+                        true,
+                        batch.shouldReply(),
+                        batch.urgency(),
+                        batch.decisionReason(),
+                        batch.replyTiming());
             }
         }
 
+        ReplyDecision decision = evaluateReplyDecision(recentMessages, userId, context);
         List<IceBreakerSuggestion> pool = buildSuggestionPool(
                 context,
                 currentUser.getInterestList(),
                 otherUser.getInterestList(),
                 sharedInterests,
-                signals);
+                signals,
+                mode,
+                language);
         Predicate<IceBreakerSuggestion> toneFilter = suggestion ->
                 tone.equals("ALL") || suggestion.tone().equals(tone);
         List<IceBreakerSuggestion> eligible = deduplicate(pool).stream()
@@ -201,14 +209,18 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         return response(
                 conversationId,
                 context,
-                guidanceFor(context) + " Live AI is not configured or temporarily unavailable, so these are offline suggestions.",
+                decision.reason() + " (Offline mode; connect OpenAI API key for live GPT suggestions)",
                 sharedInterests,
                 signals.priorTopics(),
                 selected,
                 "RULES",
                 language,
                 mode,
-                false);
+                false,
+                decision.shouldReply(),
+                decision.urgency(),
+                decision.reason(),
+                decision.timing());
     }
 
     private LiveConversationAssistant.GenerationRequest buildLiveRequest(
@@ -293,7 +305,11 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             String source,
             String language,
             String mode,
-            boolean generatedLive) {
+            boolean generatedLive,
+            String shouldReply,
+            String urgency,
+            String decisionReason,
+            String replyTiming) {
         Set<String> includedCircles = suggestions.stream()
                 .map(IceBreakerSuggestion::circle)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
@@ -312,7 +328,77 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 source,
                 language,
                 mode,
-                generatedLive);
+                generatedLive,
+                shouldReply,
+                urgency,
+                decisionReason,
+                replyTiming);
+    }
+
+    private record ReplyDecision(String shouldReply, String urgency, String reason, String timing) {}
+
+    private ReplyDecision evaluateReplyDecision(List<Message> messages, Long currentUserId, String context) {
+        if (messages == null || messages.isEmpty()) {
+            return new ReplyDecision(
+                    "RECOMMENDED",
+                    "LOW",
+                    "Start the conversation! A friendly opening question or shared topic breaks the ice nicely.",
+                    "Whenever you want to start chatting");
+        }
+
+        Message latest = messages.getFirst();
+        boolean isMine = latest.getSenderId() != null && latest.getSenderId().equals(currentUserId);
+        if (isMine) {
+            return new ReplyDecision(
+                    "NO_RUSH",
+                    "LOW",
+                    "You sent the last message. Giving them time and space to reply keeps things comfortable.",
+                    "Wait for their reply");
+        }
+
+        String content = latest.getContent() != null ? latest.getContent().trim() : "";
+        String lower = content.toLowerCase(Locale.ROOT);
+
+        boolean isQuestion = content.contains("?") || lower.matches(".*\\b(what|when|where|why|how|who|kya|kab|kaise|free|plan|batao)\\b.*");
+        boolean isClosing = lower.matches(".*\\b(good night|gn|bye|see you|cya|take care|shubh ratri|chalo bye|goodnight)\\b.*");
+
+        if (isClosing) {
+            return new ReplyDecision(
+                    "OPTIONAL",
+                    "LOW",
+                    "They sent a friendly closing. No immediate reply is needed, but an emoji or sweet sign-off works great.",
+                    "No rush, or tomorrow morning");
+        }
+
+        if (isQuestion) {
+            return new ReplyDecision(
+                    "RECOMMENDED",
+                    "HIGH",
+                    "They asked a direct question: \"" + truncate(content, 45) + "\". A reply keeps the chat alive and shows interest.",
+                    "Within 1–2 hours");
+        }
+
+        if ("SHORT_REPLIES".equals(context)) {
+            return new ReplyDecision(
+                    "OPTIONAL",
+                    "MEDIUM",
+                    "The conversation is moving with quick short messages. You can answer casually or bring up a fresh topic.",
+                    "Whenever you're free");
+        }
+
+        if ("QUIET_CONVERSATION".equals(context)) {
+            return new ReplyDecision(
+                    "RECOMMENDED",
+                    "LOW",
+                    "Some time has passed since their message. A relaxed callback or light question can restart the conversation.",
+                    "When you have a quiet moment");
+        }
+
+        return new ReplyDecision(
+                "RECOMMENDED",
+                "MEDIUM",
+                "They sent the latest message. Replying while it's fresh maintains great momentum!",
+                "Within a few hours");
     }
 
     private String detectContext(List<Message> messages) {
@@ -348,8 +434,14 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             List<String> mine,
             List<String> theirs,
             List<String> shared,
-            ConversationSignalExtractor.ConversationSignals signals) {
+            ConversationSignalExtractor.ConversationSignals signals,
+            String mode,
+            String language) {
         List<IceBreakerSuggestion> result = new ArrayList<>();
+
+        if ("UNABLE_TO_TALK".equals(mode)) {
+            addUnableToTalkSuggestions(result, language);
+        }
 
         signals.latestIncomingTopic().ifPresent(topic -> addDirectReplySuggestions(result, topic, context));
         signals.priorTopics().stream().limit(5).forEach(topic -> addCallbackSuggestions(result, topic, context));
@@ -365,6 +457,87 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         }
         addLightTouchSuggestions(result, context);
         return result;
+    }
+
+    private void addUnableToTalkSuggestions(List<IceBreakerSuggestion> result, String language) {
+        boolean includeHinglish = "HINGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
+        boolean includeEnglish = "ENGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
+
+        if (includeEnglish) {
+            result.add(new IceBreakerSuggestion(
+                    "Hey! Caught up in something right now, will reply properly in a bit! 🙌",
+                    "Busy right now",
+                    "Quick, warm acknowledgment so they know you saw their message.",
+                    "DIRECT_REPLY",
+                    circleRules.get("DIRECT_REPLY").label(),
+                    "WARM",
+                    98,
+                    "ENGLISH",
+                    false));
+            result.add(new IceBreakerSuggestion(
+                    "In the middle of work right now, but will get back to you later tonight 😊",
+                    "Work / Meeting",
+                    "Sets clear expectations without breaking the connection.",
+                    "DIRECT_REPLY",
+                    circleRules.get("DIRECT_REPLY").label(),
+                    "WARM",
+                    95,
+                    "ENGLISH",
+                    false));
+            result.add(new IceBreakerSuggestion(
+                    "Can't chat at the moment, but let's definitely catch up once I'm free!",
+                    "Can't talk now",
+                    "Keeps the energy positive while giving you time.",
+                    "LIGHT_TOUCH",
+                    circleRules.get("LIGHT_TOUCH").label(),
+                    "PLAYFUL",
+                    92,
+                    "ENGLISH",
+                    false));
+            result.add(new IceBreakerSuggestion(
+                    "A bit tied up today! Saw your text and will reply as soon as I get a break.",
+                    "Tied up",
+                    "Reassures them you will reply when you have a moment.",
+                    "DIRECT_REPLY",
+                    circleRules.get("DIRECT_REPLY").label(),
+                    "THOUGHTFUL",
+                    90,
+                    "ENGLISH",
+                    false));
+        }
+
+        if (includeHinglish) {
+            result.add(new IceBreakerSuggestion(
+                    "Thoda busy hoon abhi, free hote hi text karta hoon! 🙌",
+                    "Busy right now",
+                    "Polite and clear update so they know you're tied up.",
+                    "DIRECT_REPLY",
+                    circleRules.get("DIRECT_REPLY").label(),
+                    "WARM",
+                    97,
+                    "HINGLISH",
+                    false));
+            result.add(new IceBreakerSuggestion(
+                    "Abhi thoda kaam mein fasa hoon, shaam ko aaram se reply karta hoon 😊",
+                    "Kaam mein busy",
+                    "Sets expectations on when you will be free.",
+                    "DIRECT_REPLY",
+                    circleRules.get("DIRECT_REPLY").label(),
+                    "WARM",
+                    94,
+                    "HINGLISH",
+                    false));
+            result.add(new IceBreakerSuggestion(
+                    "Saw your message! Abhi chat nahi kar sakta, thodi der mein baat karte hain.",
+                    "Quick update",
+                    "Acknowledges their text without ghosting.",
+                    "LIGHT_TOUCH",
+                    circleRules.get("LIGHT_TOUCH").label(),
+                    "PLAYFUL",
+                    91,
+                    "HINGLISH",
+                    false));
+        }
     }
 
     private void addDirectReplySuggestions(List<IceBreakerSuggestion> result, String rawTopic, String context) {

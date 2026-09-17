@@ -111,12 +111,52 @@
                         <div class="secure-note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Private chat</div>
                     </header>
                     <div id="messageList" class="message-list" aria-live="polite" aria-label="Messages"></div>
-                    <section id="iceBreakerPanel" class="coach-panel" aria-label="Conversation ideas" hidden>
+                    <section id="iceBreakerPanel" class="coach-panel" aria-label="AI Conversation Assistant" hidden>
                         <div class="coach-heading">
-                            <div><strong>Suggested replies</strong><p id="iceBreakerGuidance">Fresh ideas based on this chat and your interests.</p></div>
-                            <div class="coach-actions"><button id="refreshIceBreakers" class="coach-refresh" type="button" title="Get different suggestions" aria-label="Get different suggestions">↻ Refresh</button><button id="closeIceBreakers" type="button" title="Close suggestions" aria-label="Close suggestions">×</button></div>
+                            <div class="coach-title-area">
+                                <div class="coach-title-row">
+                                    <strong>AI Chat Copilot</strong>
+                                    <span id="aiModelBadge" class="ai-badge">AI Assistant</span>
+                                </div>
+                                <p id="iceBreakerGuidance">Smart suggestions &amp; advice based on this conversation.</p>
+                            </div>
+                            <div class="coach-actions">
+                                <button id="refreshIceBreakers" class="coach-refresh" type="button" title="Get different suggestions" aria-label="Get different suggestions">↻ Refresh</button>
+                                <button id="closeIceBreakers" type="button" title="Close suggestions" aria-label="Close suggestions">×</button>
+                            </div>
                         </div>
-                        <p class="coach-privacy">Tap a suggestion to add it to your message. Refresh anytime for different English or Hinglish ideas.</p>
+
+                        <!-- Should I reply? AI Advisor Card -->
+                        <div id="aiAdviceCard" class="ai-advice-card">
+                            <div class="ai-advice-header">
+                                <span class="ai-advice-eyebrow">Should you reply?</span>
+                                <span id="aiReplyVerdict" class="ai-verdict-badge">Analyzing…</span>
+                                <span id="aiUrgencyBadge" class="ai-urgency-badge"></span>
+                            </div>
+                            <p id="aiDecisionReason" class="ai-advice-reason">Reading chat context…</p>
+                            <div id="aiTimingWrapper" class="ai-timing-row">
+                                <span class="ai-timing-label">⏱️ Timing:</span>
+                                <span id="aiReplyTiming" class="ai-timing-value">Whenever you're ready</span>
+                            </div>
+                        </div>
+
+                        <!-- Situation / Mode selection -->
+                        <div class="ai-modes-bar" role="toolbar" aria-label="Conversation situation">
+                            <span class="ai-modes-label">Situation:</span>
+                            <button id="modeUnableToTalk" class="ai-mode-pill" type="button" data-mode="UNABLE_TO_TALK">🏃 Unable to talk / Busy</button>
+                            <button id="modeSuggest" class="ai-mode-pill is-active" type="button" data-mode="SUGGEST">💬 Smart reply</button>
+                            <button id="modePlayful" class="ai-mode-pill" type="button" data-tone="PLAYFUL">😄 Playful</button>
+                            <button id="modeThoughtful" class="ai-mode-pill" type="button" data-tone="THOUGHTFUL">💡 Deep</button>
+                        </div>
+
+                        <!-- Language toggle -->
+                        <div class="ai-lang-bar">
+                            <span class="ai-modes-label">Language:</span>
+                            <button id="langAuto" class="ai-lang-pill is-active" type="button" data-lang="AUTO">Auto</button>
+                            <button id="langEnglish" class="ai-lang-pill" type="button" data-lang="ENGLISH">English</button>
+                            <button id="langHinglish" class="ai-lang-pill" type="button" data-lang="HINGLISH">Hinglish</button>
+                        </div>
+
                         <div id="iceBreakerSuggestions" class="coach-suggestions"></div>
                     </section>
                     <div id="typingIndicator" class="typing" hidden><span></span><span></span><span></span><em>typing</em></div>

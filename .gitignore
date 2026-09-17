@@ -26,8 +26,9 @@ target/
 /nbdist/
 /.built-jar-path
 
-### VS Code ###
+### VS Code & Editors ###
 .vscode/
+.kilo/
 
 ### Environment & Secrets ###
 .env

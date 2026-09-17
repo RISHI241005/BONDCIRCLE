@@ -33,6 +33,15 @@ public interface LiveConversationAssistant {
             String language) {
     }
 
-    record ReplyBatch(String guidance, List<Reply> replies) {
+    record ReplyBatch(
+            String guidance,
+            List<Reply> replies,
+            String shouldReply,
+            String urgency,
+            String decisionReason,
+            String replyTiming) {
+        public ReplyBatch(String guidance, List<Reply> replies) {
+            this(guidance, replies, "RECOMMENDED", "MEDIUM", guidance, "Whenever you're ready");
+        }
     }
 }

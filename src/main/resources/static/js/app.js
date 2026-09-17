@@ -21,6 +21,9 @@ const state = {
     coachLoadedFor: new Set(),
     coachResponse: null,
     coachVariant: 0,
+    coachMode: "SUGGEST",
+    coachLanguage: "AUTO",
+    coachTone: "ALL",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -423,12 +426,20 @@ async function loadIceBreakers(automatic = false) {
     suggestions.textContent = "";
     const loading = document.createElement("p");
     loading.className = "coach-loading";
-    loading.textContent = "Reading the conversation and writing fresh replies…";
+    loading.textContent = state.coachMode === "UNABLE_TO_TALK"
+        ? "Generating polite auto-replies for when you're busy…"
+        : "Analyzing the chat and crafting smart suggestions…";
     suggestions.appendChild(loading);
+
+    updateAiToolbarStates();
+
     try {
         const params = new URLSearchParams({
             limit: "4",
             variant: String(state.coachVariant),
+            mode: state.coachMode || "SUGGEST",
+            language: state.coachLanguage || "AUTO",
+            tone: state.coachTone || "ALL",
         });
         const response = await api(`/chats/${encodeURIComponent(conversationId)}/ice-breakers?${params}`);
         if (state.activeId !== conversationId) return;
@@ -444,17 +455,68 @@ function renderIceBreakers(response) {
     const panel = $("iceBreakerPanel");
     panel.classList.toggle("is-live", Boolean(response?.generatedLive));
     panel.classList.toggle("is-fallback", !response?.generatedLive);
-    $("iceBreakerGuidance").textContent = response?.guidance || "Choose a reply that sounds like you.";
+
+    const modelBadge = $("aiModelBadge");
+    if (modelBadge) {
+        if (response?.generatedLive) {
+            modelBadge.textContent = "ChatGPT Live";
+            modelBadge.title = "Connected to OpenAI live AI";
+        } else {
+            modelBadge.textContent = "Smart Offline";
+            modelBadge.title = "Local rules engine active (Set OPENAI_API_KEY in .env for live ChatGPT)";
+        }
+    }
+
+    const guidanceEl = $("iceBreakerGuidance");
+    if (guidanceEl) {
+        guidanceEl.textContent = response?.guidance || "Smart suggestions & advice based on this conversation.";
+    }
+
+    const verdictEl = $("aiReplyVerdict");
+    const urgencyEl = $("aiUrgencyBadge");
+    const reasonEl = $("aiDecisionReason");
+    const timingEl = $("aiReplyTiming");
+
+    const shouldReply = response?.shouldReply || "RECOMMENDED";
+    if (verdictEl) {
+        verdictEl.className = "ai-verdict-badge";
+        if (shouldReply === "RECOMMENDED") {
+            verdictEl.classList.add("verdict-recommended");
+            verdictEl.textContent = "🟢 Reply recommended";
+        } else if (shouldReply === "OPTIONAL") {
+            verdictEl.classList.add("verdict-optional");
+            verdictEl.textContent = "🟡 Optional / Take your time";
+        } else {
+            verdictEl.classList.add("verdict-no-rush");
+            verdictEl.textContent = "🔵 No rush / Wait for reply";
+        }
+    }
+
+    if (urgencyEl) {
+        urgencyEl.textContent = `Urgency: ${response?.urgency || "MEDIUM"}`;
+    }
+
+    if (reasonEl) {
+        reasonEl.textContent = response?.decisionReason || response?.guidance || "Here is what we advise based on the recent messages.";
+    }
+
+    if (timingEl) {
+        timingEl.textContent = response?.replyTiming || "Whenever you're ready";
+    }
+
+    updateAiToolbarStates();
+
     const container = $("iceBreakerSuggestions");
     container.textContent = "";
     const suggestions = response?.suggestions || [];
     if (!suggestions.length) {
         const empty = document.createElement("p");
         empty.className = "coach-loading";
-        empty.textContent = "No suggestion is available right now. Please refresh and try again.";
+        empty.textContent = "No suggestion is available right now. Please tap Refresh or pick another situation.";
         container.appendChild(empty);
         return;
     }
+
     for (const suggestion of suggestions) {
         const button = document.createElement("button");
         button.type = "button";
@@ -463,16 +525,29 @@ function renderIceBreakers(response) {
         const text = document.createElement("strong");
         text.textContent = suggestion.text;
         const hint = document.createElement("small");
-        hint.textContent = `Tap to use · ${suggestion.language === "HINGLISH" ? "Hinglish" : "English"}`;
+        const langBadge = suggestion.language === "HINGLISH" ? "🇮🇳 Hinglish" : "🇬🇧 English";
+        const toneBadge = suggestion.tone ? ` · ${suggestion.tone.toLowerCase()}` : "";
+        hint.innerHTML = `<span>${langBadge}${toneBadge}</span><span class="suggestion-cta">Use reply ↵</span>`;
         button.append(text, hint);
         button.addEventListener("click", () => {
             $("messageInput").value = suggestion.text;
             resizeComposer();
-            closeIceBreakers();
             $("messageInput").focus();
+            showToast("Added to message input!", "info");
         });
         container.appendChild(button);
     }
+}
+
+function updateAiToolbarStates() {
+    $("modeUnableToTalk")?.classList.toggle("is-active", state.coachMode === "UNABLE_TO_TALK");
+    $("modeSuggest")?.classList.toggle("is-active", state.coachMode === "SUGGEST" && state.coachTone === "ALL");
+    $("modePlayful")?.classList.toggle("is-active", state.coachTone === "PLAYFUL");
+    $("modeThoughtful")?.classList.toggle("is-active", state.coachTone === "THOUGHTFUL");
+
+    $("langAuto")?.classList.toggle("is-active", (state.coachLanguage || "AUTO") === "AUTO");
+    $("langEnglish")?.classList.toggle("is-active", state.coachLanguage === "ENGLISH");
+    $("langHinglish")?.classList.toggle("is-active", state.coachLanguage === "HINGLISH");
 }
 
 function closeIceBreakers() {
@@ -916,6 +991,44 @@ $("refreshIceBreakers").addEventListener("click", () => {
     loadIceBreakers(false);
 });
 $("closeIceBreakers").addEventListener("click", closeIceBreakers);
+
+$("modeUnableToTalk")?.addEventListener("click", () => {
+    state.coachMode = "UNABLE_TO_TALK";
+    state.coachTone = "ALL";
+    state.coachVariant = 0;
+    loadIceBreakers(false);
+});
+$("modeSuggest")?.addEventListener("click", () => {
+    state.coachMode = "SUGGEST";
+    state.coachTone = "ALL";
+    state.coachVariant = 0;
+    loadIceBreakers(false);
+});
+$("modePlayful")?.addEventListener("click", () => {
+    state.coachMode = "SUGGEST";
+    state.coachTone = "PLAYFUL";
+    state.coachVariant = 0;
+    loadIceBreakers(false);
+});
+$("modeThoughtful")?.addEventListener("click", () => {
+    state.coachMode = "SUGGEST";
+    state.coachTone = "THOUGHTFUL";
+    state.coachVariant = 0;
+    loadIceBreakers(false);
+});
+
+$("langAuto")?.addEventListener("click", () => {
+    state.coachLanguage = "AUTO";
+    loadIceBreakers(false);
+});
+$("langEnglish")?.addEventListener("click", () => {
+    state.coachLanguage = "ENGLISH";
+    loadIceBreakers(false);
+});
+$("langHinglish")?.addEventListener("click", () => {
+    state.coachLanguage = "HINGLISH";
+    loadIceBreakers(false);
+});
 $("interestsButton").addEventListener("click", openInterests);
 $("interestsClose").addEventListener("click", closeInterests);
 $("interestsForm").addEventListener("submit", saveInterests);

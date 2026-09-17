@@ -54,9 +54,9 @@ chat:
     quiet-after-hours: ${ICEBREAKER_QUIET_AFTER_HOURS:6}
   ai-assistant:
     enabled: ${AI_ASSISTANT_ENABLED:true}
-    api-key: ${AI_ASSISTANT_API_KEY:${AI_GATEWAY_API_KEY:${VERCEL_OIDC_TOKEN:}}}
-    base-url: ${AI_ASSISTANT_BASE_URL:https://ai-gateway.vercel.sh/v1}
-    model: ${AI_ASSISTANT_MODEL:openai/gpt-5.4-mini}
+    api-key: ${OPENAI_API_KEY:${AI_ASSISTANT_API_KEY:${AI_GATEWAY_API_KEY:${VERCEL_OIDC_TOKEN:}}}}
+    base-url: ${AI_ASSISTANT_BASE_URL:${OPENAI_BASE_URL:https://api.openai.com/v1}}
+    model: ${AI_ASSISTANT_MODEL:${OPENAI_MODEL:gpt-4o-mini}}
     timeout-seconds: ${AI_ASSISTANT_TIMEOUT_SECONDS:25}
     history-messages: ${AI_ASSISTANT_HISTORY_MESSAGES:40}
     max-suggestions: ${AI_ASSISTANT_MAX_SUGGESTIONS:12}

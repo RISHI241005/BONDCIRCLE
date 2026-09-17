@@ -176,6 +176,62 @@ class InterestBasedIceBreakerServiceTest {
         assertEquals("HINGLISH", response.suggestions().getFirst().language());
         assertTrue(response.suggestions().getFirst().aiGenerated());
         assertTrue(response.suggestions().getFirst().text().contains("kyun"));
+        assertEquals("RECOMMENDED", response.shouldReply());
+    }
+
+    @Test
+    void advisesUserWhenQuestionIsAskedOrWhenUserSentLastMessage() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Photography"));
+        Message questionFromOther = message(2L, "Are you free this weekend?", Instant.now());
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(questionFromOther));
+
+        IceBreakerResponse response = service.getSuggestions("conversation-44", 1L);
+
+        assertEquals("RECOMMENDED", response.shouldReply());
+        assertEquals("HIGH", response.urgency());
+        assertTrue(response.decisionReason().contains("direct question"));
+
+        // When user sent the last message, advice should be NO_RUSH
+        Message myReply = message(1L, "Yes I might be free!", Instant.now().plusSeconds(1));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(myReply, questionFromOther));
+
+        IceBreakerResponse myLastResponse = service.getSuggestions("conversation-44", 1L);
+        assertEquals("NO_RUSH", myLastResponse.shouldReply());
+        assertEquals("LOW", myLastResponse.urgency());
+        assertTrue(myLastResponse.decisionReason().contains("You sent the last message"));
+    }
+
+    @Test
+    void providesPoliteBusyRepliesInUnableToTalkMode() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Photography"));
+        Message messageFromOther = message(2L, "Hey are you there?", Instant.now());
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(messageFromOther));
+
+        IceBreakerResponse response = service.getSuggestions(
+                "conversation-44", 1L, 4, "ALL", 0, "ENGLISH", "UNABLE_TO_TALK");
+
+        assertEquals("UNABLE_TO_TALK", response.mode());
+        assertTrue(response.suggestions().stream().anyMatch(s -> s.text().toLowerCase().contains("caught up") || s.text().toLowerCase().contains("busy") || s.text().toLowerCase().contains("tied up")));
     }
 
     private User user(Long id, String name, List<String> interests) {

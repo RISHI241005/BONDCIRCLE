@@ -9,8 +9,8 @@ public class AiAssistantProperties {
 
     private boolean enabled = true;
     private String apiKey = "";
-    private String baseUrl = "https://ai-gateway.vercel.sh/v1";
-    private String model = "openai/gpt-5.4-mini";
+    private String baseUrl = "https://api.openai.com/v1";
+    private String model = "gpt-4o-mini";
     private int timeoutSeconds = 25;
     private int historyMessages = 40;
     private int maxSuggestions = 12;

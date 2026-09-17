@@ -158,21 +158,48 @@ button { cursor: pointer; }
 .typing { display: flex; align-items: center; gap: .25rem; padding: .2rem 2.2rem .5rem; color: var(--muted); }
 .typing > span { width: 5px; height: 5px; background: #9399ad; }
 .typing em { margin-left: .25rem; font-size: .7rem; font-style: normal; }
-.coach-panel { padding: .8rem 1rem .9rem; border-top: 1px solid #e4e6ff; background: linear-gradient(135deg, #fafaff, #f5f7ff); }
-.coach-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; }
-.coach-heading strong { color: #333b63; font-size: .82rem; }
-.coach-heading p { margin: .18rem 0 0; color: var(--muted); font-size: .7rem; }
-.coach-actions { display: flex; gap: .3rem; }
-.coach-actions button { display: grid; place-items: center; width: 29px; height: 29px; border: 0; border-radius: 8px; color: #69708a; background: #e9ebfa; font-size: 1rem; }
-.coach-actions .coach-refresh { width: auto; padding: 0 .65rem; font-size: .68rem; font-weight: 800; }
-.coach-privacy { margin: 0 0 .68rem; color: #8a90a5; font-size: .66rem; line-height: 1.4; }
-.coach-panel.is-live { border-top-color: #cfd5ff; background: linear-gradient(135deg, #f8f9ff, #f3f8ff); }
-.coach-panel.is-fallback .coach-heading strong::after { content: "Offline"; margin-left: .45rem; padding: .12rem .34rem; border-radius: 999px; color: #8a672f; background: #fff2ce; font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; }
-.coach-suggestions { display: flex; gap: .55rem; overflow-x: auto; padding-bottom: .1rem; }
-.coach-suggestion { min-width: min(270px, 80vw); padding: .72rem .8rem; border: 1px solid #dde0fb; border-radius: 12px; color: #323950; background: white; text-align: left; box-shadow: 0 4px 13px rgba(37,49,105,.05); }
-.coach-suggestion:hover { border-color: #aeb6ff; transform: translateY(-1px); }
-.coach-suggestion strong { display: block; font-size: .78rem; line-height: 1.45; }
-.coach-suggestion small { display: block; margin-top: .45rem; color: #737b9c; font-size: .62rem; font-weight: 700; }
+.coach-panel { padding: .85rem 1.1rem .95rem; border-top: 1px solid #e0e4fa; background: linear-gradient(135deg, #fbfbfe, #f4f6fd); }
+.coach-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; margin-bottom: .6rem; }
+.coach-title-area { display: grid; gap: .15rem; }
+.coach-title-row { display: flex; align-items: center; gap: .5rem; }
+.coach-title-row strong { color: #23284d; font-size: .88rem; font-weight: 800; letter-spacing: -.01em; }
+.ai-badge { padding: .15rem .45rem; border-radius: 999px; font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; background: #e8ebff; color: #4353d9; }
+.coach-panel.is-live .ai-badge { background: #dff7ea; color: #157947; }
+.coach-panel.is-fallback .ai-badge { background: #fff3d6; color: #8a5e18; }
+.coach-heading p { margin: 0; color: #6b738e; font-size: .72rem; }
+.coach-actions { display: flex; gap: .35rem; }
+.coach-actions button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; color: #586180; background: #e8ebfa; font-size: 1rem; cursor: pointer; transition: all .15s ease; }
+.coach-actions button:hover { background: #dcdffd; color: #23284d; }
+.coach-actions .coach-refresh { width: auto; padding: 0 .7rem; font-size: .7rem; font-weight: 800; }
+
+/* Should I Reply? Advice Card */
+.ai-advice-card { margin-bottom: .75rem; padding: .75rem .9rem; border: 1px solid #d8ddf8; border-radius: 14px; background: white; box-shadow: 0 4px 14px rgba(35, 45, 95, .04); }
+.ai-advice-header { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; margin-bottom: .35rem; }
+.ai-advice-eyebrow { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #78819e; }
+.ai-verdict-badge { padding: .18rem .55rem; border-radius: 999px; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
+.ai-verdict-badge.verdict-recommended { background: #e6f9ed; color: #11783e; border: 1px solid #bcf0cc; }
+.ai-verdict-badge.verdict-optional { background: #fff8e6; color: #9c6c0e; border: 1px solid #fde7b0; }
+.ai-verdict-badge.verdict-no-rush { background: #eef2f8; color: #4e5a75; border: 1px solid #d6deea; }
+.ai-urgency-badge { padding: .14rem .4rem; border-radius: 6px; font-size: .58rem; font-weight: 700; text-transform: uppercase; background: #f0f2f9; color: #646d87; }
+.ai-advice-reason { margin: 0 0 .4rem; color: #272d45; font-size: .76rem; line-height: 1.45; font-weight: 500; }
+.ai-timing-row { display: flex; align-items: center; gap: .35rem; font-size: .68rem; color: #5f6885; }
+.ai-timing-label { font-weight: 700; color: #404868; }
+.ai-timing-value { font-weight: 600; background: #f3f5fc; padding: .1rem .4rem; border-radius: 5px; }
+
+/* Situation & Mode toolbar */
+.ai-modes-bar, .ai-lang-bar { display: flex; align-items: center; gap: .35rem; overflow-x: auto; padding-bottom: .35rem; margin-bottom: .45rem; }
+.ai-modes-label { flex: 0 0 auto; font-size: .68rem; font-weight: 800; text-transform: uppercase; color: #878ea7; margin-right: .2rem; }
+.ai-mode-pill, .ai-lang-pill { flex: 0 0 auto; padding: .32rem .65rem; border: 1px solid #dbe0f5; border-radius: 999px; background: white; color: #454d6d; font-size: .7rem; font-weight: 700; cursor: pointer; transition: all .15s ease; }
+.ai-mode-pill:hover, .ai-lang-pill:hover { border-color: #a8b3ff; color: #273062; transform: translateY(-1px); }
+.ai-mode-pill.is-active, .ai-lang-pill.is-active { background: #4856df; border-color: #4856df; color: white; box-shadow: 0 2px 8px rgba(72, 86, 223, .25); }
+.ai-mode-pill[data-mode="UNABLE_TO_TALK"] { border-color: #f7d1bc; color: #a4481c; background: #fffaf7; }
+.ai-mode-pill[data-mode="UNABLE_TO_TALK"].is-active { background: #e05e26; border-color: #e05e26; color: white; box-shadow: 0 2px 8px rgba(224, 94, 38, .3); }
+.coach-suggestions { display: flex; gap: .55rem; overflow-x: auto; padding-bottom: .2rem; }
+.coach-suggestion { min-width: min(290px, 80vw); padding: .78rem .88rem; border: 1px solid #dde0fb; border-radius: 13px; color: #323950; background: white; text-align: left; box-shadow: 0 4px 14px rgba(37,49,105,.05); cursor: pointer; transition: all .15s ease; }
+.coach-suggestion:hover { border-color: #929eff; transform: translateY(-2px); box-shadow: 0 6px 18px rgba(37,49,105,.09); }
+.coach-suggestion strong { display: block; font-size: .8rem; line-height: 1.45; color: #222744; }
+.coach-suggestion small { display: flex; align-items: center; justify-content: space-between; margin-top: .5rem; color: #6f7797; font-size: .64rem; font-weight: 700; }
+.coach-suggestion .suggestion-cta { color: #3b4cd4; font-weight: 800; }
 .coach-loading { color: var(--muted); font-size: .76rem; }
 .composer { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: .7rem; padding: .85rem 1rem; border-top: 1px solid var(--line); background: white; }
 .composer textarea { width: 100%; min-height: 48px; max-height: 140px; resize: none; padding: .78rem 5.2rem .78rem 1rem; border: 1px solid var(--line); border-radius: 15px; outline: 0; line-height: 1.45; }
