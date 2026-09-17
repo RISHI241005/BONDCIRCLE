@@ -162,22 +162,24 @@
                             </div>
                         </div>
 
-                        <!-- Situation / Mode selection -->
-                        <div class="ai-modes-bar" role="toolbar" aria-label="Conversation situation">
-                            <span class="ai-modes-label">Vibe &amp; Mode:</span>
-                            <button id="modeUnableToTalk" class="ai-mode-pill" type="button" data-mode="UNABLE_TO_TALK" title="Send a polite holding reply without being rude">🏃 Unable to talk / Busy</button>
-                            <button id="modeSuggest" class="ai-mode-pill is-active" type="button" data-mode="SUGGEST" title="Auto-match the mood and context">💬 Smart reply</button>
-                            <button id="modeWarm" class="ai-mode-pill" type="button" data-tone="WARM" title="Warm and flirty replies">❤️ Warm &amp; Flirty</button>
-                            <button id="modePlayful" class="ai-mode-pill" type="button" data-tone="PLAYFUL" title="Teasing and witty replies">😄 Playful</button>
-                            <button id="modeThoughtful" class="ai-mode-pill" type="button" data-tone="THOUGHTFUL" title="Thoughtful and deep replies">💡 Deep</button>
-                        </div>
+                        <!-- Situation / Mode & Language Toolbars -->
+                        <div class="ai-toolbars-group">
+                            <div class="ai-modes-bar" role="toolbar" aria-label="Conversation situation">
+                                <span class="ai-modes-label">Vibe &amp; Mode:</span>
+                                <button id="modeUnableToTalk" class="ai-mode-pill" type="button" data-mode="UNABLE_TO_TALK" title="Send a polite holding reply without being rude">🏃 Unable to talk / Busy</button>
+                                <button id="modeSuggest" class="ai-mode-pill is-active" type="button" data-mode="SUGGEST" title="Auto-match the mood and context">💬 Smart reply</button>
+                                <button id="modeWarm" class="ai-mode-pill" type="button" data-tone="WARM" title="Warm and flirty replies">❤️ Warm &amp; Flirty</button>
+                                <button id="modePlayful" class="ai-mode-pill" type="button" data-tone="PLAYFUL" title="Teasing and witty replies">😄 Playful</button>
+                                <button id="modeThoughtful" class="ai-mode-pill" type="button" data-tone="THOUGHTFUL" title="Thoughtful and deep replies">💡 Deep</button>
+                            </div>
 
-                        <!-- Language toggle -->
-                        <div class="ai-lang-bar">
-                            <span class="ai-modes-label">Language:</span>
-                            <button id="langAuto" class="ai-lang-pill is-active" type="button" data-lang="AUTO">✨ Auto</button>
-                            <button id="langEnglish" class="ai-lang-pill" type="button" data-lang="ENGLISH">🇬🇧 English</button>
-                            <button id="langHinglish" class="ai-lang-pill" type="button" data-lang="HINGLISH">🇮🇳 Hinglish</button>
+                            <!-- Language toggle -->
+                            <div class="ai-lang-bar">
+                                <span class="ai-modes-label">Language:</span>
+                                <button id="langAuto" class="ai-lang-pill is-active" type="button" data-lang="AUTO">✨ Auto</button>
+                                <button id="langEnglish" class="ai-lang-pill" type="button" data-lang="ENGLISH">🇬🇧 English</button>
+                                <button id="langHinglish" class="ai-lang-pill" type="button" data-lang="HINGLISH">🇮🇳 Hinglish</button>
+                            </div>
                         </div>
 
                         <div id="iceBreakerSuggestions" class="coach-suggestions"></div>

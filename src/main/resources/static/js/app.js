@@ -440,6 +440,7 @@ async function loadIceBreakers(automatic = false) {
     const suggestions = $("iceBreakerSuggestions");
     panel.hidden = false;
     $("iceBreakerButton").setAttribute("aria-expanded", "true");
+    $("iceBreakerButton").classList.add("is-active");
     suggestions.textContent = "";
     const loading = document.createElement("p");
     loading.className = "coach-loading";
@@ -486,7 +487,9 @@ function renderIceBreakers(response) {
 
     const guidanceEl = $("iceBreakerGuidance");
     if (guidanceEl) {
-        guidanceEl.textContent = response?.guidance || "Smart suggestions & advice based on this conversation.";
+        guidanceEl.textContent = response?.generatedLive
+            ? (response?.guidance || "Live AI recommendations tailored to your conversation flow.")
+            : "Smart suggestions & advice tailored to your conversation.";
     }
 
     const moodEl = $("aiDetectedMood");
@@ -581,6 +584,7 @@ function updateAiToolbarStates() {
 function closeIceBreakers() {
     $("iceBreakerPanel").hidden = true;
     $("iceBreakerButton").setAttribute("aria-expanded", "false");
+    $("iceBreakerButton").classList.remove("is-active");
 }
 
 function openInterests() {
