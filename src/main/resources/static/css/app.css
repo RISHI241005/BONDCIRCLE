@@ -1370,6 +1370,14 @@ button { cursor: pointer; }
     box-shadow: 0 4px 12px rgba(219, 39, 119, 0.35);
 }
 
+.ai-lang-pill[data-lang="HINGLISH"].is-active {
+    background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+    border-color: #c2410c;
+    border-bottom-color: #9a3412;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(234, 88, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
 /* 3D Suggestion Tiles */
 .coach-suggestions {
     display: flex;

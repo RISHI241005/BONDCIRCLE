@@ -1063,14 +1063,17 @@ $("modeThoughtful")?.addEventListener("click", () => {
 
 $("langAuto")?.addEventListener("click", () => {
     state.coachLanguage = "AUTO";
+    state.coachVariant = 0;
     loadIceBreakers(false);
 });
 $("langEnglish")?.addEventListener("click", () => {
     state.coachLanguage = "ENGLISH";
+    state.coachVariant = 0;
     loadIceBreakers(false);
 });
 $("langHinglish")?.addEventListener("click", () => {
     state.coachLanguage = "HINGLISH";
+    state.coachVariant = 0;
     loadIceBreakers(false);
 });
 $("interestsButton").addEventListener("click", openInterests);

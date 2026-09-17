@@ -185,7 +185,10 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
                 2. Bespoke customization: Every single reply MUST directly refer to the specific nouns, verbs, topics, inside jokes, or sentiments they actually mentioned in the chat.
                 3. Mood Alignment: The replies must feel alive and human. If they are playful, reply with witty banter. If they had a rough/hectic day, reply with genuine warmth. If making plans, give concrete engaging answers.
                 4. UNABLE TO TALK: When user is busy, acknowledge their specific message before stating you are tied up.
-                5. Requested language: %s. For AUTO, naturally match the recent chat: use English for English conversations and comfortable Roman-script Hinglish when the chat contains Hindi or Hinglish. If ambiguous, provide a mix.
+                5. Requested language: %s.
+                   - If HINGLISH: You MUST write every single reply in authentic, fluent, modern Roman-script Hinglish (Hindi words written with English alphabet, mixed naturally with English as texted by urban youth in India, e.g., "Arre waah, yeh toh mast plan hai!", "Aaj ka din kaafi hectic tha kya? Thoda aaram karo", "Abhi thoda fasa hoon, free hote hi pakka call/text karta hoon!"). Strictly DO NOT use Devanagari script. Ensure "language": "HINGLISH" in the JSON response.
+                   - If ENGLISH: Write in natural, modern conversational English. Ensure "language": "ENGLISH" in the JSON response.
+                   - If AUTO: Inspect recent messages. If they contain Hindi or Hinglish words (e.g. kya, hai, nahi, yaar, chal, sun, kaisa), write in comfortable Roman-script Hinglish; if English, write in English. If ambiguous, provide a balanced mix.
                 6. Requested tone: %s. ALL means vary tones naturally.
                 7. Return %d reply option(s).
                 8. Never sound robotic. Never mention being an AI.

@@ -7,6 +7,7 @@ import com.datingapp.chat.conversation.entity.Conversation;
 import com.datingapp.chat.conversation.repository.ConversationParticipantRepository;
 import com.datingapp.chat.conversation.repository.ConversationRepository;
 import com.datingapp.chat.icebreaker.dto.IceBreakerResponse;
+import com.datingapp.chat.icebreaker.dto.IceBreakerSuggestion;
 import com.datingapp.chat.icebreaker.service.impl.InterestBasedIceBreakerService;
 import com.datingapp.chat.message.repository.MessageRepository;
 import com.datingapp.chat.message.entity.Message;
@@ -25,6 +26,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -307,6 +309,57 @@ class InterestBasedIceBreakerServiceTest {
         assertEquals("Playful challenge and banter back-and-forth", response.conversationScenario());
         assertEquals("Within 10-15 minutes", response.replyTiming());
         assertEquals("Oh it is definitely on! Loser gets the winner dessert? 😏", response.suggestions().getFirst().text());
+    }
+
+    @Test
+    void returnsOfflineHinglishSuggestionsWhenRequested() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Photography"));
+        Message incoming = message(2L, "Photography exhibition ke baare mein suna kya?", Instant.now());
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(incoming));
+
+        IceBreakerResponse response = service.getSuggestions(
+                "conversation-44", 1L, 4, "ALL", 0, "HINGLISH", "SUGGEST");
+
+        assertFalse(response.generatedLive());
+        assertEquals("RULES", response.source());
+        assertFalse(response.suggestions().isEmpty());
+        for (IceBreakerSuggestion suggestion : response.suggestions()) {
+            assertEquals("HINGLISH", suggestion.language());
+        }
+    }
+
+    @Test
+    void autoDetectsHinglishChatAndPrioritizesHinglishSuggestions() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Music"));
+        Message incoming = message(2L, "Aaj office me bohot kaam tha yaar, kaafi thak gaya", Instant.now());
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(incoming));
+
+        IceBreakerResponse response = service.getSuggestions(
+                "conversation-44", 1L, 4, "ALL", 0, "AUTO", "SUGGEST");
+
+        assertFalse(response.suggestions().isEmpty());
+        assertEquals("Exhausted & Stressed", response.detectedMood());
+        assertEquals("HINGLISH", response.suggestions().getFirst().language());
     }
 
     private User user(Long id, String name, List<String> interests) {

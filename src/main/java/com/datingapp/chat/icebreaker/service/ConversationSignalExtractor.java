@@ -30,7 +30,9 @@ public class ConversationSignalExtractor {
             "today", "very", "want", "what", "when", "where", "which", "with", "would", "yeah",
             "your", "youre", "you", "yes", "thanks", "thank", "please", "sorry", "gmail", "email",
             "phone", "number", "http", "https", "www", "com", "aur", "hai", "haan", "nahi", "kya",
-            "kaise", "mein", "mera", "meri", "tum", "aap", "acha", "accha", "theek", "bas"
+            "kaise", "mein", "mera", "meri", "tum", "aap", "acha", "accha", "theek", "bas",
+            "kuch", "bahut", "bohot", "bhi", "toh", "ab", "kab", "kahan", "hoga", "hogi",
+            "raha", "rahi", "bhai", "yaar", "chalo", "suno", "waise"
     );
 
     private final LanguageModerationService moderationService;
@@ -91,6 +93,7 @@ public class ConversationSignalExtractor {
         boolean isQuestion = isQuestion(incomingText);
         String detectedMood = detectMood(messages, incomingText);
         String scenarioSummary = describeScenario(messages, currentUserId, incomingText, detectedMood, latestTopic);
+        boolean isHinglish = isHinglishConversation(messages);
 
         return new ConversationSignals(
                 latestTopic,
@@ -98,7 +101,19 @@ public class ConversationSignalExtractor {
                 detectedMood,
                 scenarioSummary,
                 latestIncoming.map(Message::getContent),
-                isQuestion);
+                isQuestion,
+                isHinglish);
+    }
+
+    public boolean isHinglishConversation(List<Message> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return false;
+        }
+        String combined = messages.stream()
+                .limit(8)
+                .map(m -> m.getContent() == null ? "" : m.getContent().toLowerCase(Locale.ROOT))
+                .collect(java.util.stream.Collectors.joining(" "));
+        return combined.matches(".*\\b(kya|hai|nahi|kaise|kuch|yaar|batao|accha|theek|shukriya|bhai|karo|hoga|hogi|raha|rahi|milte|chal|sahi|arre|arrey|haan|kaun|kab|kahan|bohot|bahut|thoda|fasa|baat|shaam|subah|suno|suniye|bhi|toh|kal|aaj|shandar|badhiya|poora|waise|pata|soch|karenge|bata|karein|karna|hote)\\b.*");
     }
 
     private String detectMood(List<Message> messages, String latestText) {
@@ -108,22 +123,22 @@ public class ConversationSignalExtractor {
                 .reduce("", (a, b) -> a + " " + b)
                 + " " + latestText.toLowerCase(Locale.ROOT);
 
-        if (combined.matches(".*\\b(hectic|tired|thak|exhausted|deadline|stress|headache|bura din|fasa|kaam|work|office)\\b.*")) {
+        if (combined.matches(".*\\b(hectic|tired|thak|thaka|thaki|exhausted|deadline|stress|headache|bura din|fasa|kaam|work|office|pareshan|dimag kharab)\\b.*")) {
             return "Exhausted & Stressed";
         }
-        if (combined.matches(".*\\b(haha|lmao|lol|rofl|kidding|joke|masti|pagal|funny|mzaak|😂|🤣|😄|😜)\\b.*")) {
+        if (combined.matches(".*\\b(haha|lmao|lol|rofl|kidding|joke|masti|pagal|funny|mzaak|mazak|bakwaas|dramebaaz|arre yaar|arrey yaar|😂|🤣|😄|😜)\\b.*")) {
             return "Playful & Teasing";
         }
-        if (combined.matches(".*\\b(cute|handsome|beautiful|sweet|miss you|coffee|date|dinner|meet|milte|romance|❤️|😍|blush)\\b.*")) {
+        if (combined.matches(".*\\b(cute|handsome|beautiful|sweet|miss you|coffee|date|dinner|meet|milte|romance|khoobsurat|pyaari|pyaara|taareef|yaad|❤️|😍|blush)\\b.*")) {
             return "Flirtatious & Warm";
         }
-        if (combined.matches(".*\\b(trip|travel|excited|can't wait|super|awesome|party|concert|shandar|badhiya|🔥|🎉)\\b.*")) {
+        if (combined.matches(".*\\b(trip|travel|excited|can't wait|super|awesome|party|concert|shandar|badhiya|maza|dhamaka|kya baat|zabardast|🔥|🎉)\\b.*")) {
             return "Excited & Enthusiastic";
         }
-        if (combined.matches(".*\\b(night|sleepy|bed|neend|soja|thak gaya|goodnight|gn|chalo bye)\\b.*")) {
+        if (combined.matches(".*\\b(night|sleepy|bed|neend|soja|thak gaya|goodnight|gn|chalo bye|shubh ratri)\\b.*")) {
             return "Late-night & Cozy";
         }
-        if (combined.matches(".*\\b(feel|life|think|deep|sach|heart|sad|upset|advice|bura|problem|alone)\\b.*")) {
+        if (combined.matches(".*\\b(feel|life|think|deep|sach|heart|sad|upset|advice|bura|problem|alone|akela|pareshaan|samajh)\\b.*")) {
             return "Reflective & Sincere";
         }
         return "Casual & Engaging";
@@ -196,10 +211,21 @@ public class ConversationSignalExtractor {
             String detectedMood,
             String scenarioSummary,
             Optional<String> latestIncomingText,
-            boolean isQuestion
+            boolean isQuestion,
+            boolean isHinglish
     ) {
         public ConversationSignals(Optional<String> latestIncomingTopic, List<String> priorTopics) {
-            this(latestIncomingTopic, priorTopics, "Casual & Engaging", "General conversation flow", Optional.empty(), false);
+            this(latestIncomingTopic, priorTopics, "Casual & Engaging", "General conversation flow", Optional.empty(), false, false);
+        }
+
+        public ConversationSignals(
+                Optional<String> latestIncomingTopic,
+                List<String> priorTopics,
+                String detectedMood,
+                String scenarioSummary,
+                Optional<String> latestIncomingText,
+                boolean isQuestion) {
+            this(latestIncomingTopic, priorTopics, detectedMood, scenarioSummary, latestIncomingText, isQuestion, false);
         }
     }
 

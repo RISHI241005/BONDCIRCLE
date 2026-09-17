@@ -165,7 +165,7 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                         recentMessages));
         if (liveBatch.isPresent()) {
             List<IceBreakerSuggestion> liveSuggestions = mapLiveSuggestions(
-                    liveBatch.get().replies(), tone, safeLimit);
+                    liveBatch.get().replies(), tone, language, safeLimit);
             if (!liveSuggestions.isEmpty()) {
                 LiveConversationAssistant.ReplyBatch batch = liveBatch.get();
                 return response(
@@ -197,14 +197,38 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 signals,
                 mode,
                 language);
+
+        List<IceBreakerSuggestion> deduplicated = deduplicate(pool);
+        List<IceBreakerSuggestion> languageFiltered;
+        if ("HINGLISH".equalsIgnoreCase(language)) {
+            List<IceBreakerSuggestion> hinglishOnly = deduplicated.stream()
+                    .filter(s -> "HINGLISH".equalsIgnoreCase(s.language()))
+                    .toList();
+            languageFiltered = hinglishOnly.isEmpty() ? deduplicated : hinglishOnly;
+        } else if ("ENGLISH".equalsIgnoreCase(language)) {
+            List<IceBreakerSuggestion> englishOnly = deduplicated.stream()
+                    .filter(s -> "ENGLISH".equalsIgnoreCase(s.language()))
+                    .toList();
+            languageFiltered = englishOnly.isEmpty() ? deduplicated : englishOnly;
+        } else {
+            if (signals.isHinglish()) {
+                List<IceBreakerSuggestion> hinglishOnly = deduplicated.stream()
+                        .filter(s -> "HINGLISH".equalsIgnoreCase(s.language()))
+                        .toList();
+                languageFiltered = hinglishOnly.isEmpty() ? deduplicated : hinglishOnly;
+            } else {
+                languageFiltered = deduplicated;
+            }
+        }
+
         Predicate<IceBreakerSuggestion> toneFilter = suggestion ->
                 tone.equals("ALL") || suggestion.tone().equals(tone);
-        List<IceBreakerSuggestion> eligible = deduplicate(pool).stream()
+        List<IceBreakerSuggestion> eligible = languageFiltered.stream()
                 .filter(toneFilter)
                 .filter(suggestion -> !moderationService.analyze(suggestion.text()).flagged())
                 .toList();
         if (eligible.isEmpty() && !tone.equals("ALL")) {
-            eligible = deduplicate(pool).stream()
+            eligible = languageFiltered.stream()
                     .filter(suggestion -> !moderationService.analyze(suggestion.text()).flagged())
                     .toList();
         }
@@ -272,10 +296,14 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
     private List<IceBreakerSuggestion> mapLiveSuggestions(
             List<LiveConversationAssistant.Reply> replies,
             String requestedTone,
+            String requestedLanguage,
             int limit) {
-        List<IceBreakerSuggestion> result = mapLiveSuggestionsInternal(replies, requestedTone, limit);
+        List<IceBreakerSuggestion> result = mapLiveSuggestionsInternal(replies, requestedTone, requestedLanguage, limit);
         if (result.isEmpty() && !requestedTone.equals("ALL")) {
-            return mapLiveSuggestionsInternal(replies, "ALL", limit);
+            result = mapLiveSuggestionsInternal(replies, "ALL", requestedLanguage, limit);
+        }
+        if (result.isEmpty() && !"AUTO".equalsIgnoreCase(requestedLanguage)) {
+            result = mapLiveSuggestionsInternal(replies, requestedTone, "AUTO", limit);
         }
         return result;
     }
@@ -283,14 +311,18 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
     private List<IceBreakerSuggestion> mapLiveSuggestionsInternal(
             List<LiveConversationAssistant.Reply> replies,
             String requestedTone,
+            String requestedLanguage,
             int limit) {
         Map<String, IceBreakerSuggestion> unique = new LinkedHashMap<>();
         int rank = 0;
         for (LiveConversationAssistant.Reply reply : replies) {
             String text = truncate(reply.text(), 500).trim();
             String tone = normalizeGeneratedTone(reply.tone());
+            String lang = normalizeGeneratedLanguage(reply.language());
             if (text.isBlank()
                     || (!requestedTone.equals("ALL") && !requestedTone.equals(tone))
+                    || ("HINGLISH".equalsIgnoreCase(requestedLanguage) && !"HINGLISH".equalsIgnoreCase(lang))
+                    || ("ENGLISH".equalsIgnoreCase(requestedLanguage) && !"ENGLISH".equalsIgnoreCase(lang))
                     || moderationService.analyze(text).flagged()) {
                 continue;
             }
@@ -306,7 +338,7 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                     rule.label(),
                     tone,
                     Math.max(70, 100 - rank++),
-                    normalizeGeneratedLanguage(reply.language()),
+                    lang,
                     true));
             if (unique.size() >= limit) {
                 break;
@@ -467,19 +499,40 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             addUnableToTalkSuggestions(result, language, signals);
         }
 
-        signals.latestIncomingTopic().ifPresent(topic -> addDirectReplySuggestions(result, topic, context, signals));
-        signals.priorTopics().stream().limit(5).forEach(topic -> addCallbackSuggestions(result, topic, context));
-        shared.stream().limit(4).forEach(interest -> addSharedInterestSuggestions(result, interest, context));
+        boolean includeHinglish = "HINGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
+        boolean includeEnglish = "ENGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
 
-        List<String> discoveryTopics = theirs.stream()
-                .filter(interest -> shared.stream().noneMatch(value -> value.equalsIgnoreCase(interest)))
-                .limit(5)
-                .toList();
-        discoveryTopics.forEach(interest -> addDiscoverySuggestions(result, interest, context));
-        if (discoveryTopics.isEmpty() && !mine.isEmpty()) {
-            addSelfDisclosureSuggestions(result, mine.getFirst(), context);
+        if (includeEnglish) {
+            signals.latestIncomingTopic().ifPresent(topic -> addDirectReplySuggestions(result, topic, context, signals));
+            signals.priorTopics().stream().limit(5).forEach(topic -> addCallbackSuggestions(result, topic, context));
+            shared.stream().limit(4).forEach(interest -> addSharedInterestSuggestions(result, interest, context));
+
+            List<String> discoveryTopics = theirs.stream()
+                    .filter(interest -> shared.stream().noneMatch(value -> value.equalsIgnoreCase(interest)))
+                    .limit(5)
+                    .toList();
+            discoveryTopics.forEach(interest -> addDiscoverySuggestions(result, interest, context));
+            if (discoveryTopics.isEmpty() && !mine.isEmpty()) {
+                addSelfDisclosureSuggestions(result, mine.getFirst(), context);
+            }
+            addLightTouchSuggestions(result, context);
         }
-        addLightTouchSuggestions(result, context);
+
+        if (includeHinglish) {
+            signals.latestIncomingTopic().ifPresent(topic -> addHinglishDirectReplySuggestions(result, topic, context, signals));
+            signals.priorTopics().stream().limit(5).forEach(topic -> addHinglishCallbackSuggestions(result, topic, context));
+            shared.stream().limit(4).forEach(interest -> addHinglishSharedInterestSuggestions(result, interest, context));
+
+            List<String> discoveryTopics = theirs.stream()
+                    .filter(interest -> shared.stream().noneMatch(value -> value.equalsIgnoreCase(interest)))
+                    .limit(5)
+                    .toList();
+            discoveryTopics.forEach(interest -> addHinglishDiscoverySuggestions(result, interest, context));
+            if (discoveryTopics.isEmpty() && !mine.isEmpty()) {
+                addHinglishSelfDisclosureSuggestions(result, mine.getFirst(), context);
+            }
+            addHinglishLightTouchSuggestions(result, context);
+        }
         return result;
     }
 
@@ -569,7 +622,19 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         }
 
         if (includeHinglish) {
-            if (hasTopic) {
+            if (isQuestion) {
+                String questionTarget = hasTopic ? " (" + topic + " ke baare mein)" : "";
+                result.add(new IceBreakerSuggestion(
+                        "Tumhara sawal dekha" + questionTarget + "! Abhi thoda fasa hoon, aaram se poora jawab deta hoon thodi der mein 😊",
+                        hasTopic ? topic : "Question",
+                        "Sawal acknowledge karke warm holding reply.",
+                        "DIRECT_REPLY",
+                        circleRules.get("DIRECT_REPLY").label(),
+                        "WARM",
+                        99,
+                        "HINGLISH",
+                        false));
+            } else if (hasTopic) {
                 result.add(new IceBreakerSuggestion(
                         "Thoda busy hoon abhi! " + topic + " wala text dekha, free hote hi aaram se baat karta hoon 🙌",
                         topic,
@@ -593,18 +658,40 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                         96,
                         "HINGLISH",
                         false));
-            } else {
+            } else if ("Playful & Teasing".equals(mood)) {
                 result.add(new IceBreakerSuggestion(
-                        "Thoda sa busy hoon abhi, shaam ko free hote hi text karta hoon! 🙌",
-                        "Quick update",
-                        "Seedha aur polite message bina ghost kare.",
+                        "Haha abhi fasa hoon thoda! Mere bina shuru mat ho jana, thodi der mein text karta hoon 😄",
+                        "Playful holding",
+                        "Masti aur banter continue rakhte hue holding message.",
                         "LIGHT_TOUCH",
                         circleRules.get("LIGHT_TOUCH").label(),
-                        "WARM",
-                        93,
+                        "PLAYFUL",
+                        95,
                         "HINGLISH",
                         false));
             }
+
+            result.add(new IceBreakerSuggestion(
+                    "Thoda sa busy hoon abhi, shaam ko free hote hi text karta hoon! 🙌",
+                    "Quick update",
+                    "Seedha aur polite message bina ghost kare.",
+                    "LIGHT_TOUCH",
+                    circleRules.get("LIGHT_TOUCH").label(),
+                    "WARM",
+                    93,
+                    "HINGLISH",
+                    false));
+
+            result.add(new IceBreakerSuggestion(
+                    "Abhi baat nahi kar paunga, par free hote hi pakka catch up karte hain!",
+                    "Can't talk now",
+                    "Friendly holding message bina awkwardness ke.",
+                    "LIGHT_TOUCH",
+                    circleRules.get("LIGHT_TOUCH").label(),
+                    "PLAYFUL",
+                    90,
+                    "HINGLISH",
+                    false));
         }
     }
 
@@ -732,6 +819,167 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Goals",
                 "What’s something you’d love to get better at this year?",
                 "Invites aspiration while staying open and respectful.", context, 1);
+    }
+
+    private void addHinglishDirectReplySuggestions(
+            List<IceBreakerSuggestion> result,
+            String rawTopic,
+            String context,
+            ConversationSignalExtractor.ConversationSignals signals) {
+        String topic = displayTopic(rawTopic);
+        String mood = signals.detectedMood();
+
+        if ("Playful & Teasing".equals(mood)) {
+            addHinglish(result, "DIRECT_REPLY", "PLAYFUL", topic,
+                    "Arre waah, sach mein tum " + topic + " ke baare mein bata rahe ho? 😄 Poori baat batao!",
+                    "Witty aur teasing banter ke saath chat aage badhata hai.", context, 5);
+            addHinglish(result, "DIRECT_REPLY", "WARM", topic,
+                    topic + " sunkar lag raha hai ki koi mast scene chal raha hai 😉",
+                    "Playful teasing ke saath chemistry banata hai.", context, 4);
+        } else if ("Exhausted & Stressed".equals(mood)) {
+            addHinglish(result, "DIRECT_REPLY", "WARM", topic,
+                    "Arre baap re, " + topic + " sunkar hi thaka dene wala lag raha hai. Abhi thoda aaram karne ka time mila?",
+                    "Unke stress ko samajhkar caring aur warm response deta hai.", context, 5);
+            addHinglish(result, "DIRECT_REPLY", "THOUGHTFUL", topic,
+                    "Gehri saans lo! " + topic + " ki wajah se apna poora evening kharab mat hone do.",
+                    "Calm aur supportive reassurance deta hai.", context, 4);
+        } else if ("Excited & Enthusiastic".equals(mood)) {
+            addHinglish(result, "DIRECT_REPLY", "CURIOUS", topic,
+                    topic + " ko lekar itni badhiya energy dekhkar maza aa gaya! Best part kya tha?",
+                    "High energy ko match karte hue curiosity show karta hai.", context, 5);
+            addHinglish(result, "DIRECT_REPLY", "WARM", topic,
+                    "Yeh " + topic + " wali vibe sach mein contagious hai! Sab kuch batao 😄",
+                    "Excitement celebrate karte hue baat aage badhata hai.", context, 4);
+        } else if ("Flirtatious & Warm".equals(mood)) {
+            addHinglish(result, "DIRECT_REPLY", "PLAYFUL", topic,
+                    topic + " ke baare mein baat karne ka yeh andaaz kaafi cute hai 😉",
+                    "Romantic spark aur chemistry ko deepen karta hai.", context, 5);
+            addHinglish(result, "DIRECT_REPLY", "WARM", topic,
+                    "Tumhara " + topic + " wala text dekhkar din ban gaya 😊",
+                    "Affectionate aur warm acknowledgment.", context, 4);
+        } else if ("Late-night & Cozy".equals(mood)) {
+            addHinglish(result, "DIRECT_REPLY", "WARM", topic,
+                    "Itni der raat ko " + topic + " ki baatein! Vaise neend nahi aa rahi kya? 🌙",
+                    "Late-night cozy feel ke saath natural reply.", context, 5);
+            addHinglish(result, "DIRECT_REPLY", "PLAYFUL", topic,
+                    "Late night thoughts on " + topic + "! Kal aaram se sunte hain ya abhi bataoge?",
+                    "No pressure gentle closing.", context, 4);
+        } else if (signals.isQuestion()) {
+            addHinglish(result, "DIRECT_REPLY", "CURIOUS", topic,
+                    topic + " ke baare mein accha sawal poocha! Vaise tumhare dimag mein yeh kaise aaya?",
+                    "Unke sawal ke peeche ki curiosity explore karta hai.", context, 5);
+            addHinglish(result, "DIRECT_REPLY", "WARM", topic,
+                    "Iska answer toh mere paas mast hai, suno " + topic + " ke baare mein kya hua tha!",
+                    "Direct aur engaging response.", context, 4);
+        } else {
+            addHinglish(result, "DIRECT_REPLY", "CURIOUS", topic,
+                    "Main sach mein curious tha ki " + topic + " kaisa raha tumhare liye!",
+                    "Unke share kiye topic par genuine interest dikhata hai.", context, 4);
+            addHinglish(result, "DIRECT_REPLY", "WARM", topic,
+                    topic + " ke baare mein aur sunna chahunga, aage kya hua?",
+                    "Richer aur open reply invite karta hai.", context, 3);
+        }
+    }
+
+    private void addHinglishCallbackSuggestions(List<IceBreakerSuggestion> result, String rawTopic, String context) {
+        String topic = displayTopic(rawTopic);
+        addHinglish(result, "CALLBACK", "WARM", topic,
+                "Tumne pehle " + topic + " ka zikr kiya tha — kaisa raha phir wo?",
+                "Pehle ki baat yaad rakhna genuine attention dikhata hai.", context, 4);
+        addHinglish(result, "CALLBACK", "CURIOUS", topic,
+                "Main wahi soch raha tha jo tumne " + topic + " ke baare mein bola tha. Koi naya update?",
+                "Purani chat ke thread ko casually revive karta hai.", context, 3);
+        addHinglish(result, "CALLBACK", "PLAYFUL", topic,
+                "Chalo, mujhe " + topic + " ki kahani ka agla episode sunao jaldi 😄",
+                "Playful callback se baat me maza aata hai.", context, 1);
+    }
+
+    private void addHinglishSharedInterestSuggestions(List<IceBreakerSuggestion> result, String interest, String context) {
+        addHinglish(result, "COMMON_GROUND", "WARM", interest,
+                "Hum dono ko " + interest + " pasand hai — isse judi tumhari sabse memorable baat kya hai?",
+                "Shared interest par personal aur warm discussion shuru karta hai.", context, 4);
+        addHinglish(result, "COMMON_GROUND", "CURIOUS", interest,
+                interest + " ke baare mein aisi kaunsi baat hai jo kam logon ko samajh aati hai?",
+                "Dono ki favorite cheez par deep opinion invite karta hai.", context, 3);
+        addHinglish(result, "COMMON_GROUND", "PLAYFUL", interest,
+                "Agar hume " + interest + " ke liye ek poora free din mil jaye, toh plan kya banega?",
+                "Ek fun aur imaginative shared plan banata hai.", context, 2);
+    }
+
+    private void addHinglishDiscoverySuggestions(List<IceBreakerSuggestion> result, String interest, String context) {
+        addHinglish(result, "DISCOVERY", "CURIOUS", interest,
+                "Maine dekha tumhe " + interest + " ka shauk hai — iski shuruaat kaise hui?",
+                "Unke interest ke peeche ki story jaan ne me madad karta hai.", context, 4);
+        addHinglish(result, "DISCOVERY", "PLAYFUL", interest,
+                "Quick choice: ek relaxed sa " + interest + " day ya kuch super adventurous?",
+                "Aasan either-or sawal jiska jawab dena exciting hai.", context, 3);
+        addHinglish(result, "DISCOVERY", "THOUGHTFUL", interest,
+                interest + " mein tumhe sabse zyada kya pasand hai jo log miss kar dete hain?",
+                "Surface level se aage badhkar thoughtful sawal poochta hai.", context, 2);
+    }
+
+    private void addHinglishSelfDisclosureSuggestions(List<IceBreakerSuggestion> result, String interest, String context) {
+        addHinglish(result, "DISCOVERY", "WARM", interest,
+                "Aaj kal mujhe " + interest + " bohot pasand aa raha hai. Tumhe recently kya accha lag raha hai?",
+                "Apna batakar unse poochne se convo balanced lagta hai.", context, 2);
+        addHinglish(result, "DISCOVERY", "CURIOUS", interest,
+                "Mera recent favorite " + interest + " hai! Tum mujhe kaunsi cheez recommend karoge?",
+                "Two-way recommendation discovery start karta hai.", context, 1);
+    }
+
+    private void addHinglishLightTouchSuggestions(List<IceBreakerSuggestion> result, String context) {
+        addHinglish(result, "LIGHT_TOUCH", "WARM", "Aaj ka din",
+                "Aaj ke din ka sabse best part kya raha?",
+                "Warm aur natural sawal jiska jawab dena bohot aasan hai.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Chai / Coffee",
+                "Chai ya coffee? Aur shaam ka kya scene hai?",
+                "Lighthearted aur relatable icebreaker.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "CURIOUS", "Favorite baatein",
+                "Aisi kaunsi cheez hai jiske baare mein tum bina thake ghanto baat kar sakte ho?",
+                "Unki real passion jaan ne ka accha tarika.", context, 2);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Upcoming plans",
+                "Aane wale dinon mein aisi kaunsi cheez hai jiska sabse zyada intezaar hai?",
+                "Future-focused aur positive mood maintain karta hai.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Vibe choice",
+                "Pick one: subah ki chai, der raat tak baatein, ya lazy weekend afternoon?",
+                "Teen choices se jawab dena effortless ho jata hai.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "WARM", "Small wins",
+                "Koi aisi chhoti si cheez jisne aaj tumhare chehre par smile la di?",
+                "Positive story encourage karta hai bina over-personal hue.", context, 2);
+        addHinglish(result, "LIGHT_TOUCH", "CURIOUS", "Recommendations",
+                "Koi aisi movie, gaana ya jagah jo tum bina soche recommend karoge?",
+                "Recommendations se specific topics par baat nikal aati hai.", context, 2);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Goals",
+                "Is saal aisi kaunsi naye cheez seekhne ka plan hai?",
+                "Respectful aur inspiring discussion start karta hai.", context, 1);
+    }
+
+    private void addHinglish(
+            List<IceBreakerSuggestion> result,
+            String circle,
+            String tone,
+            String topic,
+            String text,
+            String reason,
+            String context,
+            int signalBoost) {
+        ConversationCircleRulesEngine.CircleRule rule = circleRules.get(circle);
+        int contextBoost = switch (context) {
+            case "SHORT_REPLIES" -> tone.equals("PLAYFUL") ? 4 : 0;
+            case "QUIET_CONVERSATION" -> circle.equals("CALLBACK") || tone.equals("WARM") ? 4 : 0;
+            case "KEEP_IT_GOING" -> circle.equals("DIRECT_REPLY") ? 4 : 0;
+            default -> circle.equals("COMMON_GROUND") || circle.equals("DISCOVERY") ? 3 : 0;
+        };
+        result.add(new IceBreakerSuggestion(
+                text,
+                topic,
+                reason,
+                circle,
+                rule.label(),
+                tone,
+                Math.min(100, rule.baseScore() + contextBoost + signalBoost),
+                "HINGLISH",
+                false));
     }
 
     private void add(
