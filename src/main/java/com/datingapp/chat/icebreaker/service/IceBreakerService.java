@@ -15,4 +15,16 @@ public interface IceBreakerService {
             int variant,
             String language,
             String mode);
+
+    IceBreakerResponse getSuggestions(
+            String conversationId,
+            Long userId,
+            int limit,
+            String tone,
+            int variant,
+            String language,
+            String mode,
+            String customApiKey,
+            String customProvider,
+            String customModel);
 }

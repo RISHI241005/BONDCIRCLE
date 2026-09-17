@@ -21,7 +21,25 @@ public interface LiveConversationAssistant {
             int variation,
             List<String> myInterests,
             List<String> theirInterests,
-            List<ConversationTurn> history) {
+            List<ConversationTurn> history,
+            String customApiKey,
+            String customProvider,
+            String customModel) {
+
+        public GenerationRequest(
+                Long userId,
+                String conversationId,
+                String context,
+                String language,
+                String tone,
+                String mode,
+                int count,
+                int variation,
+                List<String> myInterests,
+                List<String> theirInterests,
+                List<ConversationTurn> history) {
+            this(userId, conversationId, context, language, tone, mode, count, variation, myInterests, theirInterests, history, null, null, null);
+        }
     }
 
     record Reply(

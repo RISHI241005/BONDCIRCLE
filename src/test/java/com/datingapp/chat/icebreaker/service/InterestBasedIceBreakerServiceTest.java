@@ -362,6 +362,110 @@ class InterestBasedIceBreakerServiceTest {
         assertEquals("HINGLISH", response.suggestions().getFirst().language());
     }
 
+    @Test
+    void handlesWordMirroringForShortMessagesLikeBal() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Music"));
+        Message incoming = message(2L, "bal", Instant.now());
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(incoming));
+
+        IceBreakerResponse response = service.getSuggestions(
+                "conversation-44", 1L, 4, "ALL", 0, "HINGLISH", "SUGGEST");
+
+        assertFalse(response.suggestions().isEmpty());
+        boolean hasBalMirror = response.suggestions().stream()
+                .anyMatch(s -> s.text().toLowerCase().contains("bal"));
+        assertTrue(hasBalMirror, "Should generate a playful word-mirroring suggestion referencing 'bal'");
+    }
+
+    @Test
+    void handlesDirectIntentForMealsAndFood() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Music"));
+        Message incoming = message(2L, "khana khaya?", Instant.now());
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(incoming));
+
+        IceBreakerResponse response = service.getSuggestions(
+                "conversation-44", 1L, 4, "ALL", 0, "HINGLISH", "SUGGEST");
+
+        assertFalse(response.suggestions().isEmpty());
+        boolean hasFoodReply = response.suggestions().stream()
+                .anyMatch(s -> s.text().toLowerCase().contains("khana"));
+        assertTrue(hasFoodReply, "Should directly answer the meal inquiry");
+    }
+
+    @Test
+    void supportsDynamicBYOKProviderRouting() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Music"));
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of());
+
+        LiveConversationAssistant liveAssistant = req -> Optional.of(new LiveConversationAssistant.ReplyBatch(
+                "Live Gemini Guidance",
+                List.of(new LiveConversationAssistant.Reply(
+                        "Excited to explore new places together!",
+                        "Travel",
+                        "Direct connection",
+                        "DIRECT_REPLY",
+                        "WARM",
+                        "ENGLISH")),
+                "RECOMMENDED",
+                "HIGH",
+                "Direct reply to conversation",
+                "Immediately",
+                "Warm & Excited",
+                "Friendly chat"));
+
+        LanguageModerationService moderationService = new LanguageModerationService();
+        IceBreakerService dynamicService = new InterestBasedIceBreakerService(
+                conversationRepository,
+                participantRepository,
+                messageRepository,
+                userRepository,
+                new ConversationCircleRulesEngine(),
+                new ConversationSignalExtractor(moderationService),
+                moderationService,
+                new IceBreakerProperties(),
+                new AiAssistantProperties(),
+                liveAssistant);
+
+        IceBreakerResponse response = dynamicService.getSuggestions(
+                "conversation-44", 1L, 4, "ALL", 0, "ENGLISH", "SUGGEST",
+                "AIzaSyCustomKey", "gemini", "gemini-2.0-flash");
+
+        assertTrue(response.generatedLive());
+        assertEquals("LIVE_GEMINI", response.source());
+        assertEquals(1, response.suggestions().size());
+        assertEquals("Excited to explore new places together!", response.suggestions().getFirst().text());
+    }
+
     private User user(Long id, String name, List<String> interests) {
         User user = new User();
         user.setId(id);

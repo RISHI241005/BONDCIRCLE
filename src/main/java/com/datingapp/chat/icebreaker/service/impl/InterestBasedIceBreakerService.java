@@ -110,6 +110,22 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             int variant,
             String requestedLanguage,
             String requestedMode) {
+        return getSuggestions(conversationId, userId, limit, requestedTone, variant, requestedLanguage, requestedMode, null, null, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public IceBreakerResponse getSuggestions(
+            String conversationId,
+            Long userId,
+            int limit,
+            String requestedTone,
+            int variant,
+            String requestedLanguage,
+            String requestedMode,
+            String customApiKey,
+            String customProvider,
+            String customModel) {
         Conversation conversation = conversationRepository.findByPublicId(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Conversation not found: " + conversationId, ErrorCode.CONVERSATION_NOT_FOUND));
@@ -162,12 +178,18 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                         variant,
                         currentUser,
                         otherUser,
-                        recentMessages));
+                        recentMessages,
+                        customApiKey,
+                        customProvider,
+                        customModel));
         if (liveBatch.isPresent()) {
             List<IceBreakerSuggestion> liveSuggestions = mapLiveSuggestions(
                     liveBatch.get().replies(), tone, language, safeLimit);
             if (!liveSuggestions.isEmpty()) {
                 LiveConversationAssistant.ReplyBatch batch = liveBatch.get();
+                String source = (customProvider != null && !customProvider.isBlank())
+                        ? "LIVE_" + customProvider.toUpperCase(Locale.ROOT)
+                        : "LIVE_AI";
                 return response(
                         conversationId,
                         context,
@@ -175,7 +197,7 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                         sharedInterests,
                         signals.priorTopics(),
                         liveSuggestions,
-                        "LIVE_AI",
+                        source,
                         language,
                         mode,
                         true,
@@ -240,7 +262,7 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         return response(
                 conversationId,
                 context,
-                decision.reason() + " (Offline mode; connect OpenAI API key for live GPT suggestions)",
+                decision.reason() + " (Offline mode; connect Gemini or OpenAI API key for live AI suggestions)",
                 sharedInterests,
                 signals.priorTopics(),
                 selected,
@@ -267,7 +289,10 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             int variation,
             User currentUser,
             User otherUser,
-            List<Message> recentMessages) {
+            List<Message> recentMessages,
+            String customApiKey,
+            String customProvider,
+            String customModel) {
         int historyLimit = Math.max(1, aiProperties.getHistoryMessages());
         List<LiveConversationAssistant.ConversationTurn> history = recentMessages.stream()
                 .limit(historyLimit)
@@ -290,7 +315,10 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 variation,
                 currentUser.getInterestList(),
                 otherUser.getInterestList(),
-                history);
+                history,
+                customApiKey,
+                customProvider,
+                customModel);
     }
 
     private List<IceBreakerSuggestion> mapLiveSuggestions(
@@ -498,6 +526,15 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         if ("UNABLE_TO_TALK".equals(mode)) {
             addUnableToTalkSuggestions(result, language, signals);
         }
+
+        // Direct intent recognition (meals, activity, location, availability, well-being, invitations)
+        addDirectIntentSuggestions(result, language, signals, context);
+
+        // Word mirroring for short / teaser messages (e.g., "bal", "lol", "hmm")
+        addWordMirroringSuggestions(result, language, signals, context);
+
+        // Cross-profile interest synergy
+        addInterestSynergySuggestions(result, language, mine, theirs, shared, context);
 
         boolean includeHinglish = "HINGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
         boolean includeEnglish = "ENGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
@@ -1104,6 +1141,305 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         }
         String clean = value.trim().replaceAll("\\s+", " ");
         return clean.length() <= maxLength ? clean : clean.substring(0, maxLength);
+    }
+
+    private void addDirectIntentSuggestions(
+            List<IceBreakerSuggestion> result,
+            String language,
+            ConversationSignalExtractor.ConversationSignals signals,
+            String context) {
+        if (signals.latestIncomingText().isEmpty()) {
+            return;
+        }
+        String incoming = signals.latestIncomingText().get().trim();
+        if (incoming.isBlank()) {
+            return;
+        }
+        String lower = incoming.toLowerCase(Locale.ROOT);
+        boolean includeHinglish = "HINGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
+        boolean includeEnglish = "ENGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
+
+        // Food / Meal Intent
+        if (lower.matches(".*\\b(khana|lunch|dinner|breakfast|nashta|kuch khaya|kha liya|kha rahe|food|eat|eating|ate|bhook|hungry)\\b.*")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "WARM", "Khana & Meals",
+                        "Haanji khana ho gaya! Aapne kiya kuch tasty ya abhi baaki hai? 😋",
+                        "Seedha meal check-in ka jawab dekar unse poochta hai.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Khana & Meals",
+                        "Bas abhi kha hi raha tha! Vaise aaj menu mein kya special tha aapki taraf?",
+                        "Playful food discussion shuru karta hai.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "WARM", "Meals & Food",
+                        "Yes, just grabbed a bite! Did you have your lunch/dinner yet or still working through it? 🍽️",
+                        "Directly answers the meal check-in and turns it back to them.", context, 5);
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Meals & Food",
+                        "Not yet, actually on the hunt for something good! What did you have today?",
+                        "Invites their food recommendations with light banter.", context, 4);
+            }
+        }
+
+        // Current Activity Intent
+        if (lower.matches(".*\\b(kya kar rahe|kya kr rhe|kya chal raha|kya scene|what are you doing|what r u doing|what're you doing|what you doing|sup|what's up|whats up|what up|what are you up to|what you up to)\\b.*")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "WARM", "Activity & Day",
+                        "Bas thoda kaam wrap kar raha tha, aur socha aapko text karun! Aapka din kaisa chal raha hai? 😊",
+                        "Friendly status update jo unke din ke baare mein poochti hai.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Activity & Day",
+                        "Kuch khaas nahi, bas pro level par chill kar raha tha 😄 Aap batao, kya exciting chal raha hai?",
+                        "Lighthearted aur fun update jo unki curiosity jagati hai.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "WARM", "Current Activity",
+                        "Just wrapping up a few things and was thinking about texting you! How's your day treating you? 😊",
+                        "Friendly status update that turns the attention back to them.", context, 5);
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Current Activity",
+                        "Currently mastering the fine art of relaxing 😄 What about you, productive day or chill day?",
+                        "Witty response that invites playful banter.", context, 4);
+            }
+        }
+
+        // Location / Whereabouts Intent
+        if (lower.matches(".*\\b(kahan ho|kaha ho|kidhar ho|ghar pe ho|office mein|where are you|where r u|are you home|at home|where you at)\\b.*")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "WARM", "Whereabouts",
+                        "Bas ghar par hi hoon abhi, unwind kar raha tha! Aap kahan ho abhi? 🏡",
+                        "Casual update jo unke whereabouts ke baare mein poochti hai.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Whereabouts",
+                        "Safe and sound ghar pe! Aap kahan ghoom rahe ho aaj kal? 😉",
+                        "Playful whereabouts banter.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "WARM", "Whereabouts",
+                        "Just at home unwinding right now! Where are you hanging out today? 🏡",
+                        "Casual, relaxed reply about current whereabouts.", context, 5);
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Whereabouts",
+                        "Out and about doing a couple errands! What about you, out or cozy at home?",
+                        "Lighthearted response asking where they are.", context, 4);
+            }
+        }
+
+        // Availability / Free Intent
+        if (lower.matches(".*\\b(free ho|free hai|free h|time hai|busy ho|call kar sakte|can we talk|are you free|got a minute|free now)\\b.*")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "WARM", "Availability",
+                        "Haanji abhi free hoon, bataiye kya baat hai! 😊",
+                        "Warm aur welcoming response jo ready to chat signal karta hai.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Availability",
+                        "Thoda busy tha but aapke text ke liye time nikaal liya! Bolo kya scene hai? ✨",
+                        "Charming response showing interest in talking to them.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "WARM", "Availability",
+                        "Yes, pretty free right now! What's on your mind? 😊",
+                        "Direct confirmation that you are free to chat.", context, 5);
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Availability",
+                        "Just finished what I was doing, perfect timing! What's the latest update?",
+                        "Encouraging, engaging response.", context, 4);
+            }
+        }
+
+        // Well-being / How are you Intent
+        if (lower.matches(".*\\b(kaise ho|kaisi ho|kaisa hai|sab badhiya|sab theek|tabiyat kaisi|how are you|how r u|how are things|how's it going|hows it going|how have you been)\\b.*")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "WARM", "Well-being",
+                        "Main ekdum badhiya! Aap batao, aap kaise ho aur aaj ka din kaisa raha? ✨",
+                        "Polite aur caring reply jo unka haal-chaal poochti hai.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Well-being",
+                        "Main to mast hoon! Aapki kya reports hain aaj ki? 😄",
+                        "Upbeat aur friendly check-in.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "WARM", "Well-being",
+                        "Doing great, thank you! How have you been holding up today? ✨",
+                        "Genuine and warm check-in.", context, 5);
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Well-being",
+                        "Thriving and surviving! How's your week treating you so far? 😄",
+                        "Upbeat and easygoing reply.", context, 4);
+            }
+        }
+
+        // Meetup / Invitation Intent
+        if (lower.matches(".*\\b(coffee|chai|milte hain|milna hai|milte h|hangout|hang out|meet up|meetup|plan karein|chalein|chaloge)\\b.*")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "WARM", "Meetup & Plans",
+                        "Coffee/chai ka plan to zabardast lag raha hai! Kab ka socha hai aapne? ☕",
+                        "Enthusiastic agreement inviting specific timing.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Meetup & Plans",
+                        "Done! Aap bas time aur place decide karo, main pohonch jaunga 😉",
+                        "Confident and playful acceptance of the invite.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "WARM", "Meetup & Plans",
+                        "A coffee meetup sounds awesome! When were you thinking? ☕",
+                        "Positive and receptive response to invitation.", context, 5);
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Meetup & Plans",
+                        "Count me in! Are you thinking this weekend or a quick weekday evening?",
+                        "Proactive and fun scheduling reply.", context, 4);
+            }
+        }
+    }
+
+    private void addWordMirroringSuggestions(
+            List<IceBreakerSuggestion> result,
+            String language,
+            ConversationSignalExtractor.ConversationSignals signals,
+            String context) {
+        if (signals.latestIncomingText().isEmpty()) {
+            return;
+        }
+        String incoming = signals.latestIncomingText().get().trim();
+        if (incoming.isBlank() || incoming.length() > 24) {
+            return;
+        }
+        String cleanWord = incoming.replaceAll("[^a-zA-Z0-9'\\s]", "").trim();
+        if (cleanWord.isBlank() || moderationService.analyze(cleanWord).flagged()) {
+            return;
+        }
+        String[] words = cleanWord.split("\\s+");
+        if (words.length > 3) {
+            return;
+        }
+
+        boolean includeHinglish = "HINGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
+        boolean includeEnglish = "ENGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
+        String lower = cleanWord.toLowerCase(Locale.ROOT);
+
+        if (lower.matches("^(lol|haha|hahaha|hehe|lmao|rofl)$")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Banter",
+                        "Itni hasi kis baat pe aa rahi hai, humein bhi batao! 😂",
+                        "Matches laughing reaction with teasing banter.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "WARM", "Banter",
+                        "Aapko hasa ke accha laga! Ab batao aage kya scene hai? 😉",
+                        "Positive acknowledgment keeping the conversation rolling.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Banter",
+                        "Spill the tea, what made you laugh so hard? 😂",
+                        "Playful inquiry into what made them laugh.", context, 5);
+                add(result, "DIRECT_REPLY", "WARM", "Banter",
+                        "Glad to see I made you smile! What's the latest update with you?",
+                        "Warm check-in continuing the light mood.", context, 4);
+            }
+        } else if (lower.matches("^(hmm|hmmm|hmmmm)$")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Curiosity",
+                        "Yeh 'hmm' kis type ka hai — sochne wala ya agree karne wala? 😉",
+                        "Playful probe into their short hmm response.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "CURIOUS", "Curiosity",
+                        "Itna deep soch vichar! Dimag mein kya chal raha hai batayein?",
+                        "Gentle curiosity uncovering their thoughts.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Curiosity",
+                        "Is that a thoughtful 'hmm' or a suspicious 'hmm'? 😉",
+                        "Teasing interpretation of their one-word reply.", context, 5);
+                add(result, "DIRECT_REPLY", "CURIOUS", "Curiosity",
+                        "Penny for your thoughts! What's on your mind?",
+                        "Curious opener encouraging them to elaborate.", context, 4);
+            }
+        } else if (lower.matches("^(ok|okk|okay|acha|theek|sahi hai)$")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Quick Reply",
+                        "Sirf '" + cleanWord + "'? Itna formal kyu ho rahe ho haha, kuch interesting batao!",
+                        "Short reply ko tease karke baat open karta hai.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "WARM", "Quick Reply",
+                        "Chalo badhiya! Vaise aaj shaam ka kya plan ban raha hai?",
+                        "Easy pivot to evening or upcoming plans.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Quick Reply",
+                        "Just '" + cleanWord + "'? Don't give me the cold shoulder now haha, what's new?",
+                        "Playfully calls out the short response.", context, 5);
+                add(result, "DIRECT_REPLY", "WARM", "Quick Reply",
+                        "Sounds good! How's the rest of your day shaping up?",
+                        "Warmly transitions to current plans.", context, 4);
+            }
+        } else if (lower.matches("^(hi|hey|heyy|heyyy|hello|hola)$")) {
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", "Greeting",
+                        "Hey there! Itna cheerful greeting matlab mood kaafi accha hai aaj? 😉",
+                        "Playful greeting match.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "WARM", "Greeting",
+                        "Hello hello! Kaise ho aap aur aaj ka din kaisa chal raha hai?",
+                        "Friendly and welcoming opening check-in.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "PLAYFUL", "Greeting",
+                        "Hey! That's a high-energy greeting, how's your day looking? ✨",
+                        "Matches their greeting with warmth.", context, 5);
+                add(result, "DIRECT_REPLY", "WARM", "Greeting",
+                        "Hey there! Good to hear from you, what are you up to today?",
+                        "Warm and inviting opening.", context, 4);
+            }
+        } else {
+            // General word mirroring for words like "bal", "suno", "yo", typos, etc.
+            if (includeHinglish) {
+                addHinglish(result, "DIRECT_REPLY", "PLAYFUL", cleanWord,
+                        "Wait, '" + cleanWord + "'? 😂 Typo tha ya koi secret code word? Poori baat batao!",
+                        "Playfully calls out their exact word to spark witty banter.", context, 5);
+                addHinglish(result, "DIRECT_REPLY", "CURIOUS", cleanWord,
+                        "'" + cleanWord + "' bolke suspense create kar diya haha! Aage toh bolo kya scene hai?",
+                        "Directly mirrors the message and asks for the rest.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "DIRECT_REPLY", "PLAYFUL", cleanWord,
+                        "Wait, '" + cleanWord + "'? Did autocorrect strike or is that an inside code? 😂",
+                        "Playfully mirrors their exact word with humor.", context, 5);
+                add(result, "DIRECT_REPLY", "CURIOUS", cleanWord,
+                        "Leaving me on a cliffhanger with just '" + cleanWord + "'! What's the story?",
+                        "Calls out the short teaser message and invites explanation.", context, 4);
+            }
+        }
+    }
+
+    private void addInterestSynergySuggestions(
+            List<IceBreakerSuggestion> result,
+            String language,
+            List<String> mine,
+            List<String> theirs,
+            List<String> shared,
+            String context) {
+        boolean includeHinglish = "HINGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
+        boolean includeEnglish = "ENGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
+
+        if (!shared.isEmpty()) {
+            String s = displayTopic(shared.getFirst());
+            if (includeHinglish) {
+                addHinglish(result, "COMMON_GROUND", "WARM", s,
+                        "Jab hum dono ko " + s + " pasand hai, toh isme aapki favourite jagah ya experience kaunsa raha hai? ✨",
+                        "Shared passion ko deepen karne ke liye favourite memory poochta hai.", context, 4);
+                addHinglish(result, "COMMON_GROUND", "PLAYFUL", s,
+                        "Hum dono " + s + " ke fan hain — lagta hai taste to already kaafi match karta hai humara 😉",
+                        "Playful chemistry banata hai shared interest ke around.", context, 4);
+            }
+            if (includeEnglish) {
+                add(result, "COMMON_GROUND", "WARM", s,
+                        "Since we're both into " + s + ", what's your absolute favorite experience or go-to spot for it? ✨",
+                        "Deepens connection around a shared passion.", context, 4);
+                add(result, "COMMON_GROUND", "PLAYFUL", s,
+                        "We both love " + s + " — I think that confirms our taste is already top tier 😉",
+                        "Playfully celebrates shared interest.", context, 4);
+            }
+        }
+
+        if (!mine.isEmpty() && !theirs.isEmpty()) {
+            String m = displayTopic(mine.getFirst());
+            String t = displayTopic(theirs.getFirst());
+            if (!m.equalsIgnoreCase(t)) {
+                if (includeHinglish) {
+                    addHinglish(result, "DISCOVERY", "CURIOUS", t,
+                            "Aapko " + t + " pasand hai aur mujhe " + m + ", lagta hai kaafi unique combination hai! Aap " + t + " kabse enjoy kar rahe ho?",
+                            "Dono ke profile interests ko mix karke cross-discovery karta hai.", context, 4);
+                }
+                if (includeEnglish) {
+                    add(result, "DISCOVERY", "CURIOUS", t,
+                            "You're into " + t + " and I'm really big on " + m + " — that sounds like a fun mix! How did you first get into " + t + "?",
+                            "Bridges both profiles to spark mutual discovery.", context, 4);
+                }
+            }
+        }
     }
 
     private String displayTopic(String value) {

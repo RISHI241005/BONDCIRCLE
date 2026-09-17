@@ -79,4 +79,27 @@ public class AiAssistantProperties {
     public void setMaxOutputTokens(int maxOutputTokens) {
         this.maxOutputTokens = maxOutputTokens;
     }
+
+    public String resolveBaseUrl(String provider) {
+        if (provider == null || provider.isBlank()) return baseUrl;
+        return switch (provider.toUpperCase(java.util.Locale.ROOT)) {
+            case "GEMINI" -> "https://generativelanguage.googleapis.com/v1beta/openai";
+            case "GROQ" -> "https://api.groq.com/openai/v1";
+            case "OPENAI" -> "https://api.openai.com/v1";
+            default -> baseUrl;
+        };
+    }
+
+    public String resolveModel(String provider, String requestedModel) {
+        if (requestedModel != null && !requestedModel.isBlank()) {
+            return requestedModel.trim();
+        }
+        if (provider == null || provider.isBlank()) return model;
+        return switch (provider.toUpperCase(java.util.Locale.ROOT)) {
+            case "GEMINI" -> "gemini-1.5-flash";
+            case "GROQ" -> "llama-3.3-70b-versatile";
+            case "OPENAI" -> "gpt-4o-mini";
+            default -> model;
+        };
+    }
 }

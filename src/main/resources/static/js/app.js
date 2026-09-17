@@ -460,7 +460,21 @@ async function loadIceBreakers(automatic = false) {
             language: state.coachLanguage || "AUTO",
             tone: state.coachTone || "ALL",
         });
-        const response = await api(`/chats/${encodeURIComponent(conversationId)}/ice-breakers?${params}`);
+
+        const aiHeaders = {};
+        const storedKey = localStorage.getItem("bondcircle.ai_key");
+        const storedProvider = localStorage.getItem("bondcircle.ai_provider") || "gemini";
+        const storedModel = localStorage.getItem("bondcircle.ai_model");
+
+        if (storedKey) {
+            aiHeaders["X-AI-Key"] = storedKey;
+            aiHeaders["X-AI-Provider"] = storedProvider;
+            if (storedModel) aiHeaders["X-AI-Model"] = storedModel;
+        }
+
+        const response = await api(`/chats/${encodeURIComponent(conversationId)}/ice-breakers?${params}`, {
+            headers: aiHeaders
+        });
         if (state.activeId !== conversationId) return;
         renderIceBreakers(response);
     } catch (err) {
@@ -477,12 +491,32 @@ function renderIceBreakers(response) {
 
     const modelBadge = $("aiModelBadge");
     if (modelBadge) {
+        modelBadge.classList.remove("is-live-gemini", "is-live-openai", "is-live-groq", "is-rules");
+        const source = String(response?.source || "RULES").toUpperCase();
         if (response?.generatedLive) {
-            modelBadge.textContent = "ChatGPT Live";
-            modelBadge.title = "Connected to OpenAI live AI";
+            if (source.includes("GEMINI")) {
+                modelBadge.textContent = "⚡ Gemini Live";
+                modelBadge.title = "Connected to Google Gemini live intelligence";
+                modelBadge.classList.add("is-live-gemini");
+            } else if (source.includes("GROQ")) {
+                modelBadge.textContent = "⚡ Groq Llama Live";
+                modelBadge.title = "Connected to Groq Llama 3.3 live intelligence";
+                modelBadge.classList.add("is-live-groq");
+            } else {
+                modelBadge.textContent = "⚡ ChatGPT Live";
+                modelBadge.title = "Connected to OpenAI live generative AI";
+                modelBadge.classList.add("is-live-openai");
+            }
         } else {
-            modelBadge.textContent = "Smart Offline";
-            modelBadge.title = "Local rules engine active (Set OPENAI_API_KEY in .env for live ChatGPT)";
+            const hasKey = Boolean(localStorage.getItem("bondcircle.ai_key"));
+            if (hasKey) {
+                modelBadge.textContent = "Smart Offline (Key Error)";
+                modelBadge.title = "Onboard rules engine active. Verify your key in AI Settings (⚙️).";
+            } else {
+                modelBadge.textContent = "Smart Offline Engine";
+                modelBadge.title = "Onboard smart engine active. Click ⚙️ to connect free Gemini or OpenAI key.";
+            }
+            modelBadge.classList.add("is-rules");
         }
     }
 
@@ -1407,12 +1441,145 @@ document.addEventListener("click", (event) => {
     }
 });
 
+// ==========================================
+// AI Settings & BYOK Modal Controller
+// ==========================================
+
+function openAiSettingsModal() {
+    const modal = $("aiSettingsModal");
+    if (!modal) return;
+    const storedProvider = localStorage.getItem("bondcircle.ai_provider") || "gemini";
+    const storedKey = localStorage.getItem("bondcircle.ai_key") || "";
+    const storedModel = localStorage.getItem("bondcircle.ai_model") || "";
+
+    const providerSelect = $("aiProviderSelect");
+    const keyInput = $("aiApiKeyInput");
+    const modelInput = $("aiModelInput");
+
+    if (providerSelect) providerSelect.value = storedProvider;
+    if (keyInput) keyInput.value = storedKey;
+    if (modelInput) modelInput.value = storedModel;
+
+    updateAiProviderHelp();
+    updateAiSettingsStatusCard(Boolean(storedKey), storedProvider);
+
+    modal.hidden = false;
+    if (keyInput) keyInput.focus();
+}
+
+function closeAiSettingsModal() {
+    const modal = $("aiSettingsModal");
+    if (modal) modal.hidden = true;
+}
+
+function updateAiProviderHelp() {
+    const provider = $("aiProviderSelect")?.value || "gemini";
+    const helpEl = $("aiKeyHelpText");
+    const modelInput = $("aiModelInput");
+    const keyInput = $("aiApiKeyInput");
+
+    if (provider === "gemini") {
+        if (helpEl) helpEl.innerHTML = `💡 Get a 100% free key with no credit card at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio ↗</a>`;
+        if (modelInput) modelInput.placeholder = "Default: gemini-2.0-flash";
+        if (keyInput) keyInput.placeholder = "AIzaSy...";
+    } else if (provider === "groq") {
+        if (helpEl) helpEl.innerHTML = `💡 Obtain a high-speed free tier key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Groq Console ↗</a>`;
+        if (modelInput) modelInput.placeholder = "Default: llama-3.3-70b-versatile";
+        if (keyInput) keyInput.placeholder = "gsk_...";
+    } else {
+        if (helpEl) helpEl.innerHTML = `💡 Obtain your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI Platform ↗</a>`;
+        if (modelInput) modelInput.placeholder = "Default: gpt-4o-mini";
+        if (keyInput) keyInput.placeholder = "sk-proj-...";
+    }
+}
+
+function updateAiSettingsStatusCard(hasKey, provider) {
+    const card = $("aiSettingsStatusCard");
+    const title = $("aiStatusTitle");
+    const desc = $("aiStatusDesc");
+    if (!card || !title || !desc) return;
+
+    if (hasKey) {
+        card.classList.add("is-live");
+        const provName = provider === "gemini" ? "Google Gemini" : provider === "groq" ? "Groq Llama" : "OpenAI ChatGPT";
+        title.textContent = `Connected to ${provName}`;
+        desc.textContent = "Your custom key is active. Suggestions will stream in real-time from the live LLM!";
+    } else {
+        card.classList.remove("is-live");
+        title.textContent = "Offline Smart Engine Active";
+        desc.textContent = "Using onboard smart rules, intent detection, and Hinglish banter. Connect a key for live generative LLM power!";
+    }
+}
+
+function saveAiSettings() {
+    const provider = $("aiProviderSelect")?.value || "gemini";
+    const key = $("aiApiKeyInput")?.value?.trim() || "";
+    const model = $("aiModelInput")?.value?.trim() || "";
+
+    if (key) {
+        localStorage.setItem("bondcircle.ai_key", key);
+        localStorage.setItem("bondcircle.ai_provider", provider);
+        if (model) localStorage.setItem("bondcircle.ai_model", model);
+        else localStorage.removeItem("bondcircle.ai_model");
+        showToast("Connected to live AI provider!", "info");
+    } else {
+        localStorage.removeItem("bondcircle.ai_key");
+        localStorage.removeItem("bondcircle.ai_provider");
+        localStorage.removeItem("bondcircle.ai_model");
+        showToast("Switched to smart offline engine.", "info");
+    }
+
+    closeAiSettingsModal();
+    if (state.activeId && !$("iceBreakerPanel").hidden) {
+        loadIceBreakers(false);
+    }
+}
+
+function disconnectAiSettings() {
+    localStorage.removeItem("bondcircle.ai_key");
+    localStorage.removeItem("bondcircle.ai_provider");
+    localStorage.removeItem("bondcircle.ai_model");
+
+    if ($("aiApiKeyInput")) $("aiApiKeyInput").value = "";
+    if ($("aiModelInput")) $("aiModelInput").value = "";
+    updateAiSettingsStatusCard(false, "gemini");
+
+    showToast("Disconnected key. Smart offline engine restored.", "info");
+    closeAiSettingsModal();
+    if (state.activeId && !$("iceBreakerPanel").hidden) {
+        loadIceBreakers(false);
+    }
+}
+
+$("aiSettingsButton")?.addEventListener("click", openAiSettingsModal);
+$("closeAiSettingsModal")?.addEventListener("click", closeAiSettingsModal);
+$("cancelAiSettingsBtn")?.addEventListener("click", closeAiSettingsModal);
+$("saveAiSettingsBtn")?.addEventListener("click", saveAiSettings);
+$("disconnectAiKeyBtn")?.addEventListener("click", disconnectAiSettings);
+$("aiProviderSelect")?.addEventListener("change", updateAiProviderHelp);
+$("toggleAiKeyVisibility")?.addEventListener("click", () => {
+    const keyInput = $("aiApiKeyInput");
+    const toggleBtn = $("toggleAiKeyVisibility");
+    if (!keyInput || !toggleBtn) return;
+    if (keyInput.type === "password") {
+        keyInput.type = "text";
+        toggleBtn.textContent = "🙈 Hide";
+    } else {
+        keyInput.type = "password";
+        toggleBtn.textContent = "👁️ Show";
+    }
+});
+$("aiSettingsModal")?.addEventListener("click", (event) => {
+    if (event.target === $("aiSettingsModal")) closeAiSettingsModal();
+});
+
 document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !$("moderationModal").hidden) closeModerationWarning();
     if (event.key === "Escape" && !$("interestsModal").hidden) closeInterests();
     if (event.key === "Escape" && !$("callModal").hidden) endCall();
     if (event.key === "Escape" && !$("contactInfoModal").hidden) closeContactInfo();
     if (event.key === "Escape" && !$("chatSearchOverlay").hidden) closeChatSearch();
+    if (event.key === "Escape" && $("aiSettingsModal") && !$("aiSettingsModal").hidden) closeAiSettingsModal();
 });
 
 if (state.token && state.profile) enterChat();

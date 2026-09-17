@@ -37,6 +37,9 @@ public class IceBreakerController {
             @RequestParam(defaultValue = "0") int variant,
             @RequestParam(defaultValue = "AUTO") String language,
             @RequestParam(defaultValue = "SUGGEST") String mode,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-AI-Key", required = false) String customApiKey,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-AI-Provider", required = false) String customProvider,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-AI-Model", required = false) String customModel,
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success(
                 iceBreakerService.getSuggestions(
@@ -46,6 +49,9 @@ public class IceBreakerController {
                         tone,
                         variant,
                         language,
-                        mode)));
+                        mode,
+                        customApiKey,
+                        customProvider,
+                        customModel)));
     }
 }

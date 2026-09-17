@@ -2539,6 +2539,263 @@ mark.chat-highlight {
 .moderation-footnote { margin-top: .75rem; font-size: .74rem; color: var(--muted); }
 
 /* ==========================================================================
+   AI SETTINGS & BYOK MODAL
+   ========================================================================== */
+
+.ai-settings-dialog {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 2rem;
+    max-width: 520px;
+    width: 92%;
+    box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(226, 232, 240, 0.8);
+    position: relative;
+    animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ai-settings-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.ai-settings-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+}
+
+.ai-settings-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #fef08a 0%, #f59e0b 100%);
+    font-size: 1.35rem;
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.28);
+    flex-shrink: 0;
+}
+
+.ai-settings-header h2 {
+    margin: 0;
+    font-size: 1.22rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.015em;
+}
+
+.ai-settings-subtitle {
+    margin: .25rem 0 0;
+    font-size: .8rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.ai-settings-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.ai-settings-field {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+}
+
+.ai-settings-field label {
+    font-size: .82rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.ai-field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ai-key-toggle-btn {
+    background: transparent;
+    border: none;
+    color: #6366f1;
+    font-size: .78rem;
+    font-weight: 700;
+    cursor: pointer;
+    padding: .15rem .4rem;
+    border-radius: 6px;
+    transition: background .15s ease;
+}
+
+.ai-key-toggle-btn:hover {
+    background: #eef2ff;
+}
+
+.ai-settings-select,
+.ai-settings-field input {
+    width: 100%;
+    padding: .7rem .9rem;
+    border-radius: 12px;
+    border: 1.5px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: .88rem;
+    color: #0f172a;
+    transition: all .18s ease;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.ai-settings-select:focus,
+.ai-settings-field input:focus {
+    outline: none;
+    border-color: #6366f1;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.ai-settings-hint {
+    margin: .25rem 0 0;
+    font-size: .74rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.ai-settings-hint a {
+    color: #4f46e5;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.ai-settings-hint a:hover {
+    text-decoration: underline;
+}
+
+.ai-status-card {
+    display: flex;
+    align-items: flex-start;
+    gap: .85rem;
+    padding: .9rem 1.1rem;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid #e2e8f0;
+    margin-top: .3rem;
+}
+
+.ai-status-card.is-live {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-color: #bbf7d0;
+}
+
+.ai-status-indicator {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #8b5cf6;
+    margin-top: .35rem;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+    transition: all .25s ease;
+}
+
+.ai-status-card.is-live .ai-status-indicator {
+    background: #10b981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25);
+    animation: livePulse 2s infinite ease-in-out;
+}
+
+@keyframes livePulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.18); opacity: 0.8; }
+}
+
+.ai-status-text {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+
+.ai-status-text strong {
+    font-size: .84rem;
+    color: #1e293b;
+}
+
+.ai-status-card.is-live .ai-status-text strong {
+    color: #065f46;
+}
+
+.ai-status-text span {
+    font-size: .74rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.ai-settings-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1.6rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #f1f5f9;
+    gap: .75rem;
+}
+
+.ai-disconnect-btn {
+    background: transparent;
+    border: 1px solid #fca5a5;
+    color: #dc2626;
+    padding: .65rem 1rem;
+    border-radius: 12px;
+    font-size: .82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+
+.ai-disconnect-btn:hover {
+    background: #fef2f2;
+    border-color: #f87171;
+}
+
+.ai-settings-right-actions {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+}
+
+/* Dynamic Live Provider Badges */
+.ai-badge.is-live-gemini {
+    background: linear-gradient(135deg, #1d4ed8 0%, #0284c7 100%) !important;
+    color: #ffffff !important;
+    border-color: #38bdf8 !important;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35) !important;
+}
+
+.ai-badge.is-live-openai {
+    background: linear-gradient(135deg, #047857 0%, #10b981 100%) !important;
+    color: #ffffff !important;
+    border-color: #6ee7b7 !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35) !important;
+}
+
+.ai-badge.is-live-groq {
+    background: linear-gradient(135deg, #ea580c 0%, #f59e0b 100%) !important;
+    color: #ffffff !important;
+    border-color: #fdba74 !important;
+    box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35) !important;
+}
+
+.ai-badge.is-rules {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+    color: #ffffff !important;
+    border-color: #c4b5fd !important;
+}
+
+/* ==========================================================================
    RESPONSIVE DESIGN (TABLET & MOBILE)
    ========================================================================== */
 

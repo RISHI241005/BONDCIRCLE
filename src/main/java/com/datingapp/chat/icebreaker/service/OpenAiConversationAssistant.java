@@ -60,10 +60,11 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
 
     @Override
     public Optional<ReplyBatch> generate(GenerationRequest request) {
-        if (!isConfigured()) {
+        if (!isConfigured(request)) {
             return Optional.empty();
         }
-        boolean isResponsesApi = isResponsesEndpoint();
+        String baseUrl = resolveBaseUrl(request);
+        boolean isResponsesApi = isResponsesEndpoint(baseUrl);
         try {
             JsonNode response;
             if (isResponsesApi) {
@@ -74,12 +75,19 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
             return parseResponse(response);
         } catch (Exception exception) {
             log.warn("Live conversation generation failed ({}): {}. Falling back to offline engine.",
-                    properties.getBaseUrl(), exception.getMessage());
+                    baseUrl, exception.getMessage());
             return Optional.empty();
         }
     }
 
     boolean isConfigured() {
+        return isConfigured(null);
+    }
+
+    boolean isConfigured(GenerationRequest request) {
+        if (request != null && request.customApiKey() != null && !request.customApiKey().isBlank()) {
+            return true;
+        }
         return properties.isEnabled()
                 && properties.getApiKey() != null
                 && !properties.getApiKey().isBlank()
@@ -87,15 +95,55 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
                 && !properties.getBaseUrl().isBlank();
     }
 
-    private boolean isResponsesEndpoint() {
-        String baseUrl = properties.getBaseUrl().toLowerCase(Locale.ROOT);
-        return baseUrl.contains("ai-gateway.vercel.sh") || baseUrl.endsWith("/responses");
+    private String resolveApiKey(GenerationRequest request) {
+        if (request != null && request.customApiKey() != null && !request.customApiKey().isBlank()) {
+            return request.customApiKey().trim();
+        }
+        return properties.getApiKey() != null ? properties.getApiKey().trim() : "";
+    }
+
+    private String resolveBaseUrl(GenerationRequest request) {
+        if (request != null && request.customApiKey() != null && !request.customApiKey().isBlank()) {
+            return properties.resolveBaseUrl(request.customProvider());
+        }
+        return properties.getBaseUrl();
+    }
+
+    private String resolveModel(GenerationRequest request) {
+        if (request != null && request.customApiKey() != null && !request.customApiKey().isBlank()) {
+            return properties.resolveModel(request.customProvider(), request.customModel());
+        }
+        return properties.getModel();
+    }
+
+    private RestClient clientFor(String baseUrl) {
+        if (baseUrl.equalsIgnoreCase(properties.getBaseUrl())) {
+            return this.restClient;
+        }
+        Duration timeout = Duration.ofSeconds(Math.max(3, properties.getTimeoutSeconds()));
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(timeout);
+        requestFactory.setReadTimeout(timeout);
+        return RestClient.builder()
+                .baseUrl(normalizeBaseUrl(baseUrl))
+                .requestFactory(requestFactory)
+                .build();
+    }
+
+    private boolean isResponsesEndpoint(String baseUrl) {
+        String normalized = baseUrl.toLowerCase(Locale.ROOT);
+        return normalized.contains("ai-gateway.vercel.sh") || normalized.endsWith("/responses");
     }
 
     private JsonNode callChatCompletionsEndpoint(GenerationRequest request) {
         int count = Math.max(1, Math.min(request.count(), properties.getMaxSuggestions()));
+        String effectiveApiKey = resolveApiKey(request);
+        String effectiveBaseUrl = resolveBaseUrl(request);
+        String effectiveModel = resolveModel(request);
+        RestClient client = clientFor(effectiveBaseUrl);
+
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", properties.getModel());
+        body.put("model", effectiveModel);
         body.put("messages", List.of(
                 Map.of("role", "system", "content", instructions(request.mode(), request.language(), request.tone(), count)),
                 Map.of("role", "user", "content", conversationContext(request))
@@ -104,11 +152,11 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
         body.put("max_tokens", properties.getMaxOutputTokens());
         body.put("temperature", 0.7);
 
-        String uri = properties.getBaseUrl().endsWith("/chat/completions") ? "" : "/chat/completions";
-        return restClient.post()
+        String uri = effectiveBaseUrl.endsWith("/chat/completions") ? "" : "/chat/completions";
+        return client.post()
                 .uri(uri)
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("Authorization", "Bearer " + properties.getApiKey().trim())
+                .header("Authorization", "Bearer " + effectiveApiKey)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -116,8 +164,13 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
 
     private JsonNode callResponsesEndpoint(GenerationRequest request) {
         int count = Math.max(1, Math.min(request.count(), properties.getMaxSuggestions()));
+        String effectiveApiKey = resolveApiKey(request);
+        String effectiveBaseUrl = resolveBaseUrl(request);
+        String effectiveModel = resolveModel(request);
+        RestClient client = clientFor(effectiveBaseUrl);
+
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", properties.getModel());
+        body.put("model", effectiveModel);
         body.put("store", false);
         body.put("max_output_tokens", properties.getMaxOutputTokens());
         body.put("safety_identifier", safetyIdentifier(request.userId()));
@@ -133,11 +186,11 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
                 "strict", true,
                 "schema", responseSchema(count))));
 
-        String uri = properties.getBaseUrl().endsWith("/responses") ? "" : "/responses";
-        return restClient.post()
+        String uri = effectiveBaseUrl.endsWith("/responses") ? "" : "/responses";
+        return client.post()
                 .uri(uri)
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("Authorization", "Bearer " + properties.getApiKey().trim())
+                .header("Authorization", "Bearer " + effectiveApiKey)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);

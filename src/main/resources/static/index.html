@@ -182,6 +182,7 @@
                                 </div>
                             </div>
                             <div class="coach-actions">
+                                <button id="aiSettingsButton" class="coach-action-btn" type="button" title="AI Brain Settings (Connect Gemini / OpenAI / Groq)" aria-label="AI Brain Settings">⚙️</button>
                                 <button id="minimizeIceBreakers" class="coach-action-btn" type="button" title="Minimize/Expand suggestions">⌄</button>
                                 <button id="refreshIceBreakers" class="coach-action-btn coach-refresh" type="button" title="Get different suggestions" aria-label="Get different suggestions">↻</button>
                                 <button id="closeIceBreakers" class="coach-action-btn" type="button" title="Close suggestions" aria-label="Close suggestions">✕</button>
@@ -393,6 +394,68 @@
         </section>
     </div>
 
-    <script type="module" src="/js/app.js?v=2.5.1"></script>
+    <!-- AI Brain & BYOK Settings Modal -->
+    <div id="aiSettingsModal" class="moderation-overlay" hidden>
+        <section class="ai-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="aiSettingsTitle">
+            <div class="ai-settings-header">
+                <div class="ai-settings-title-wrap">
+                    <span class="ai-settings-icon">⚡</span>
+                    <div>
+                        <h2 id="aiSettingsTitle">AI Brain &amp; Key Settings</h2>
+                        <p class="ai-settings-subtitle">Connect your free API key for instant live conversational intelligence</p>
+                    </div>
+                </div>
+                <button id="closeAiSettingsModal" class="moderation-close" type="button" aria-label="Close AI Settings">×</button>
+            </div>
+
+            <div class="ai-settings-body">
+                <div class="ai-settings-field">
+                    <label for="aiProviderSelect"><strong>AI Provider</strong></label>
+                    <select id="aiProviderSelect" class="ai-settings-select">
+                        <option value="gemini" selected>Google Gemini (Free Tier - Recommended)</option>
+                        <option value="openai">OpenAI (ChatGPT GPT-4o / GPT-4o-mini)</option>
+                        <option value="groq">Groq (Ultra-fast Llama 3.3 70B)</option>
+                    </select>
+                </div>
+
+                <div class="ai-settings-field">
+                    <div class="ai-field-label-row">
+                        <label for="aiApiKeyInput"><strong>API Key</strong></label>
+                        <button id="toggleAiKeyVisibility" type="button" class="ai-key-toggle-btn" title="Show/Hide Key">👁️ Show</button>
+                    </div>
+                    <div class="ai-key-input-wrap">
+                        <input id="aiApiKeyInput" type="password" placeholder="Paste your API key here…" autocomplete="off" spellcheck="false">
+                    </div>
+                    <p id="aiKeyHelpText" class="ai-settings-hint">
+                        💡 Get a 100% free key with no credit card at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio ↗</a>
+                    </p>
+                </div>
+
+                <div class="ai-settings-field">
+                    <label for="aiModelInput"><strong>Model ID (Optional)</strong></label>
+                    <input id="aiModelInput" type="text" placeholder="Default: gemini-2.0-flash" autocomplete="off">
+                    <p class="ai-settings-hint">Leave blank to use the provider's fastest recommended model.</p>
+                </div>
+
+                <div class="ai-status-card" id="aiSettingsStatusCard">
+                    <div class="ai-status-indicator" id="aiStatusDot"></div>
+                    <div class="ai-status-text">
+                        <strong id="aiStatusTitle">Offline Engine Active</strong>
+                        <span id="aiStatusDesc">Using onboard smart rules, intent detection, and Hinglish banter. Connect a key for live generative LLM power!</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ai-settings-actions">
+                <button id="disconnectAiKeyBtn" class="ai-disconnect-btn" type="button">Disconnect Key</button>
+                <div class="ai-settings-right-actions">
+                    <button id="cancelAiSettingsBtn" class="secondary-button" type="button">Cancel</button>
+                    <button id="saveAiSettingsBtn" class="primary-button" type="button">Save &amp; Connect</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script type="module" src="/js/app.js?v=2.6.0"></script>
 </body>
 </html>
