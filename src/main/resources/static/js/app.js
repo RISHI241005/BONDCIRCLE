@@ -18,6 +18,7 @@ const state = {
     sentTyping: false,
     moderationChecking: false,
     pendingModeratedMessage: null,
+    coachLoadedFor: new Set(),
 };
 
 const $ = (id) => document.getElementById(id);
@@ -50,6 +51,21 @@ function normalizePhone(value) {
         throw new Error("Enter a phone number with 10 to 15 digits.");
     }
     return trimmed.startsWith("+") ? `+${digits}` : digits;
+}
+
+function parseInterests(value) {
+    const seen = new Set();
+    const interests = [];
+    for (const raw of String(value || "").split(",")) {
+        const interest = raw.trim().replace(/\s+/g, " ");
+        const key = interest.toLowerCase();
+        if (!interest || seen.has(key)) continue;
+        if (interest.length > 40) throw new Error("Each interest must be 40 characters or less.");
+        seen.add(key);
+        interests.push(interest);
+    }
+    if (interests.length > 10) throw new Error("Add no more than 10 interests.");
+    return interests;
 }
 
 function showToast(message, type = "info") {
@@ -154,6 +170,7 @@ async function handleRegister(event) {
         const email = $("registerEmail").value.trim();
         const password = $("registerPassword").value;
         const confirmPassword = $("registerConfirm").value;
+        const interests = parseInterests($("registerInterests").value);
         if (!fullName) throw new Error("Enter your full name.");
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
         if (!/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*]).{8,128}$/.test(password)) {
@@ -163,7 +180,7 @@ async function handleRegister(event) {
         setFormBusy(form, true, "Creating account…");
         await api("/users/register", {
             method: "POST",
-            body: JSON.stringify({ fullName, phone, email, password, confirmPassword }),
+            body: JSON.stringify({ fullName, phone, email, password, confirmPassword, interests }),
         });
         const profile = await api("/users/login", {
             method: "POST",
@@ -206,6 +223,7 @@ function logout(notify = true) {
     state.conversations = [];
     state.messages.clear();
     state.activeId = null;
+    state.coachLoadedFor.clear();
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(PROFILE_KEY);
     chatView.hidden = true;
@@ -294,6 +312,7 @@ async function openConversation(conversation, moveToChat = true) {
     if (moveToChat) workspace.classList.add("is-chat-open");
     renderConversations();
     $("messageList").textContent = "";
+    closeIceBreakers();
 
     try {
         const page = await api(`/chats/${encodeURIComponent(state.activeId)}/messages?limit=50`);
@@ -301,6 +320,7 @@ async function openConversation(conversation, moveToChat = true) {
         state.messages.set(state.activeId, messages);
         renderMessages();
         acknowledgeLatestIncoming(messages);
+        maybeSurfaceIceBreakers(messages);
     } catch (err) {
         showToast(err.message, "error");
     }
@@ -371,6 +391,105 @@ function upsertMessage(message) {
     }
     renderConversations();
     if (conversationId === state.activeId) renderMessages();
+}
+
+function shouldSurfaceIceBreakers(messages) {
+    if (!messages.length) return true;
+    const lastMessageAt = new Date(messages[messages.length - 1]?.createdAt || 0).getTime();
+    if (lastMessageAt && Date.now() - lastMessageAt > 6 * 60 * 60 * 1000) return true;
+    if (messages.length < 3) return false;
+    return messages.slice(-4).filter((message) => String(message.content || "").trim().length <= 24).length >= 3;
+}
+
+function maybeSurfaceIceBreakers(messages) {
+    if (!shouldSurfaceIceBreakers(messages) || state.coachLoadedFor.has(state.activeId)) return;
+    state.coachLoadedFor.add(state.activeId);
+    loadIceBreakers(true);
+}
+
+async function loadIceBreakers(automatic = false) {
+    const conversationId = state.activeId;
+    if (!conversationId) return;
+    const panel = $("iceBreakerPanel");
+    const suggestions = $("iceBreakerSuggestions");
+    panel.hidden = false;
+    $("iceBreakerButton").setAttribute("aria-expanded", "true");
+    suggestions.textContent = "";
+    const loading = document.createElement("p");
+    loading.className = "coach-loading";
+    loading.textContent = "Finding a natural way to keep things moving…";
+    suggestions.appendChild(loading);
+    try {
+        const response = await api(`/chats/${encodeURIComponent(conversationId)}/ice-breakers`);
+        if (state.activeId !== conversationId) return;
+        renderIceBreakers(response);
+    } catch (err) {
+        closeIceBreakers();
+        if (!automatic) showToast(err.message, "error");
+    }
+}
+
+function renderIceBreakers(response) {
+    $("iceBreakerGuidance").textContent = response?.guidance || "Pick an idea to add it to your message.";
+    const container = $("iceBreakerSuggestions");
+    container.textContent = "";
+    for (const suggestion of response?.suggestions || []) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "coach-suggestion";
+        button.title = suggestion.reason || "Use this suggestion";
+        const topic = document.createElement("span");
+        topic.textContent = suggestion.topic || "Conversation idea";
+        const text = document.createElement("strong");
+        text.textContent = suggestion.text;
+        button.append(topic, text);
+        button.addEventListener("click", () => {
+            $("messageInput").value = suggestion.text;
+            resizeComposer();
+            closeIceBreakers();
+            $("messageInput").focus();
+        });
+        container.appendChild(button);
+    }
+}
+
+function closeIceBreakers() {
+    $("iceBreakerPanel").hidden = true;
+    $("iceBreakerButton").setAttribute("aria-expanded", "false");
+}
+
+function openInterests() {
+    $("interestsInput").value = (state.profile?.interests || []).join(", ");
+    $("interestsModal").hidden = false;
+    document.body.style.overflow = "hidden";
+    $("interestsInput").focus();
+}
+
+function closeInterests() {
+    $("interestsModal").hidden = true;
+    document.body.style.overflow = "";
+}
+
+async function saveInterests(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+        const interests = parseInterests($("interestsInput").value);
+        setFormBusy(form, true, "Saving…");
+        const response = await api("/users/me/interests", {
+            method: "PUT",
+            body: JSON.stringify({ interests }),
+        });
+        state.profile.interests = response.interests || interests;
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
+        state.coachLoadedFor.clear();
+        closeInterests();
+        showToast("Your interests have been updated.");
+    } catch (err) {
+        showToast(err.message, "error");
+    } finally {
+        setFormBusy(form, false);
+    }
 }
 
 async function handleSearch(event) {
@@ -766,8 +885,21 @@ $("moderationSendAnyway").addEventListener("click", () => sendModeratedMessage()
 $("moderationModal").addEventListener("click", (event) => {
     if (event.target === $("moderationModal")) closeModerationWarning();
 });
+$("iceBreakerButton").addEventListener("click", () => {
+    if ($("iceBreakerPanel").hidden) loadIceBreakers(false);
+    else closeIceBreakers();
+});
+$("refreshIceBreakers").addEventListener("click", () => loadIceBreakers(false));
+$("closeIceBreakers").addEventListener("click", closeIceBreakers);
+$("interestsButton").addEventListener("click", openInterests);
+$("interestsClose").addEventListener("click", closeInterests);
+$("interestsForm").addEventListener("submit", saveInterests);
+$("interestsModal").addEventListener("click", (event) => {
+    if (event.target === $("interestsModal")) closeInterests();
+});
 document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !$("moderationModal").hidden) closeModerationWarning();
+    if (event.key === "Escape" && !$("interestsModal").hidden) closeInterests();
 });
 
 if (state.token && state.profile) enterChat();

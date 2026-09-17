@@ -52,6 +52,8 @@
                         <label>Phone number<input id="registerPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+91 98765 43210" maxlength="20" required></label>
                     </div>
                     <label>Email<input id="registerEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" maxlength="100" required></label>
+                    <label>Interests <span class="optional-label">optional</span><input id="registerInterests" name="interests" autocomplete="off" placeholder="Travel, music, cooking" maxlength="300"></label>
+                    <p class="interest-hint">Separate interests with commas. These help create better conversation suggestions.</p>
                     <div class="field-row">
                         <label>Password<input id="registerPassword" name="password" type="password" autocomplete="new-password" placeholder="8+ strong characters" minlength="8" maxlength="128" required></label>
                         <label>Confirm password<input id="registerConfirm" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Repeat password" minlength="8" maxlength="128" required></label>
@@ -69,6 +71,7 @@
             <a class="brand" href="/" aria-label="BondCircle home"><span class="brand-mark" aria-hidden="true"><span></span><span></span></span><span>BondCircle</span></a>
             <div class="account-actions">
                 <div class="live-state"><span id="liveDot" class="live-dot"></span><span id="liveLabel">Connecting</span></div>
+                <button id="interestsButton" class="interest-button" type="button" title="Edit your interests">My interests</button>
                 <div id="profileAvatar" class="avatar avatar--small" aria-hidden="true">BC</div>
                 <div class="account-copy"><strong id="profileName">Account</strong><span id="profilePhone"></span></div>
                 <button id="logoutButton" class="icon-button" type="button" title="Sign out" aria-label="Sign out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/></svg></button>
@@ -104,9 +107,17 @@
                         <button id="mobileBackButton" class="icon-button mobile-back" type="button" aria-label="Back to chats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
                         <div id="chatAvatar" class="avatar">?</div>
                         <div class="conversation-person"><strong id="chatName">Conversation</strong><span id="chatPresence">Offline</span></div>
+                        <button id="iceBreakerButton" class="coach-button" type="button" aria-expanded="false" aria-controls="iceBreakerPanel" title="Get conversation ideas"><span aria-hidden="true">✦</span> Ideas</button>
                         <div class="secure-note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Private chat</div>
                     </header>
                     <div id="messageList" class="message-list" aria-live="polite" aria-label="Messages"></div>
+                    <section id="iceBreakerPanel" class="coach-panel" aria-label="Conversation ideas" hidden>
+                        <div class="coach-heading">
+                            <div><strong>A little conversation boost</strong><p id="iceBreakerGuidance">Pick an idea to add it to your message.</p></div>
+                            <div class="coach-actions"><button id="refreshIceBreakers" type="button" title="Refresh ideas" aria-label="Refresh ideas">↻</button><button id="closeIceBreakers" type="button" title="Close ideas" aria-label="Close ideas">×</button></div>
+                        </div>
+                        <div id="iceBreakerSuggestions" class="coach-suggestions"></div>
+                    </section>
                     <div id="typingIndicator" class="typing" hidden><span></span><span></span><span></span><em>typing</em></div>
                     <form id="messageForm" class="composer">
                         <label class="sr-only" for="messageInput">Message</label>
@@ -122,6 +133,21 @@
             </section>
         </div>
     </main>
+
+    <div id="interestsModal" class="moderation-overlay" hidden>
+        <section class="interests-dialog" role="dialog" aria-modal="true" aria-labelledby="interestsTitle">
+            <button id="interestsClose" class="moderation-close" type="button" aria-label="Close interests">×</button>
+            <p class="eyebrow">Personalize your ideas</p>
+            <h2 id="interestsTitle">What are you into?</h2>
+            <p>Add up to 10 interests. They are used to make conversation starters feel more natural.</p>
+            <form id="interestsForm">
+                <label for="interestsInput">Your interests</label>
+                <input id="interestsInput" autocomplete="off" maxlength="300" placeholder="Travel, cricket, films, cooking">
+                <p>Separate each interest with a comma.</p>
+                <button class="primary-button" type="submit"><span>Save interests</span></button>
+            </form>
+        </section>
+    </div>
 
     <div id="moderationModal" class="moderation-overlay" hidden>
         <section class="moderation-dialog" role="dialog" aria-modal="true" aria-labelledby="moderationTitle" aria-describedby="moderationDescription">

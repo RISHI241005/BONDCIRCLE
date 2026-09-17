@@ -1,6 +1,7 @@
 package com.datingapp.chat.security;
 
 import jakarta.validation.constraints.*;
+import java.util.List;
 import java.util.Objects;
 
 public class RegisterRequest {
@@ -30,6 +31,9 @@ public class RegisterRequest {
     @NotBlank(message = "Password confirmation is required")
     @Size(min = 8, max = 128, message = "Password confirmation must be between 8 and 128 characters")
     private String confirmPassword;
+
+    @Size(max = 10, message = "You can add up to 10 interests")
+    private List<@NotBlank @Size(max = 40, message = "Each interest must not exceed 40 characters") String> interests;
 
     public String getFullName() {
         return fullName;
@@ -71,6 +75,14 @@ public class RegisterRequest {
         this.confirmPassword = confirmPassword;
     }
 
+    public List<String> getInterests() {
+        return interests;
+    }
+
+    public void setInterests(List<String> interests) {
+        this.interests = interests;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -80,11 +92,12 @@ public class RegisterRequest {
                 Objects.equals(phone, that.phone) &&
                 Objects.equals(email, that.email) &&
                 Objects.equals(password, that.password) &&
-                Objects.equals(confirmPassword, that.confirmPassword);
+                Objects.equals(confirmPassword, that.confirmPassword) &&
+                Objects.equals(interests, that.interests);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(fullName, phone, email, password, confirmPassword);
+        return Objects.hash(fullName, phone, email, password, confirmPassword, interests);
     }
 }

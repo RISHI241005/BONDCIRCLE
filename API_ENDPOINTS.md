@@ -40,6 +40,15 @@
 | PATCH | `/api/v1/chats/{conversationId}/messages/{messageId}` | Yes | `{ "content": String }` | - | `{ success: true, data: MessageResponse, message: "Message updated successfully", requestId: String }` | 400, 401, 403, 404, 409 | Edit sent message (original sender only) |
 | DELETE | `/api/v1/chats/{conversationId}/messages/{messageId}` | Yes | - | - | `{ success: true, data: MessageResponse, message: "Message deleted successfully", requestId: String }` | 401, 403, 404, 409 | Soft-delete message (original sender only) |
 
+### Interests and Ice Breakers
+
+| METHOD | URL | AUTH | REQUEST BODY | RESPONSE | ERROR RESPONSES | PURPOSE |
+|---|---|---|---|---|---|---|
+| PUT | `/api/v1/users/me/interests` | Yes | `{ "interests": ["Travel", "Music"] }` | `{ success: true, data: { interests: String[] } }` | 400, 401 | Replace the authenticated user's interests (maximum 10) |
+| GET | `/api/v1/chats/{conversationId}/ice-breakers` | Yes | - | `{ success: true, data: { conversationId, context, guidance, sharedInterests, suggestions } }` | 401, 403, 404 | Return three private, editable conversation suggestions based on interests and recent message shape |
+
+Ice-breaker suggestions are drafts only. The client places a selected suggestion in the composer so the user can edit and deliberately send it.
+
 ### Presence
 
 | METHOD | URL | AUTH | REQUEST BODY | RESPONSE | ERROR RESPONSES | PURPOSE |

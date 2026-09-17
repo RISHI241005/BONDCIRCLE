@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class UserService {
@@ -52,6 +53,7 @@ public class UserService {
                 email,
                 encodedPassword
         );
+        user.setInterestList(normalizeInterests(request.getInterests()));
 
         userRepository.save(user);
 
@@ -61,7 +63,8 @@ public class UserService {
                 String.valueOf(user.getId()),
                 user.getEmail(),
                 user.getFullName(),
-                user.getPhone()
+                user.getPhone(),
+                user.getInterestList()
         );
     }
 
@@ -87,8 +90,41 @@ public class UserService {
                 user.getEmail(),
                 user.getFullName(),
                 user.getPhone(),
-                token
+                token,
+                user.getInterestList()
         );
+    }
+
+    @Transactional
+    public UserInterestsResponse updateInterests(Long userId, List<String> interests) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+        List<String> normalized = normalizeInterests(interests);
+        user.setInterestList(normalized);
+        userRepository.save(user);
+        return new UserInterestsResponse(normalized);
+    }
+
+    private List<String> normalizeInterests(List<String> interests) {
+        if (interests == null) {
+            return List.of();
+        }
+        java.util.LinkedHashMap<String, String> unique = new java.util.LinkedHashMap<>();
+        for (String interest : interests) {
+            if (interest == null || interest.isBlank()) {
+                continue;
+            }
+            String clean = interest.trim().replaceAll("\\s+", " ");
+            if (clean.length() > 40) {
+                throw new BadRequestException("Each interest must not exceed 40 characters");
+            }
+            String displayValue = clean.substring(0, 1).toUpperCase(Locale.ROOT) + clean.substring(1);
+            unique.putIfAbsent(clean.toLowerCase(Locale.ROOT), displayValue);
+            if (unique.size() > 10) {
+                throw new BadRequestException("You can add up to 10 interests");
+            }
+        }
+        return List.copyOf(unique.values());
     }
 
     /**

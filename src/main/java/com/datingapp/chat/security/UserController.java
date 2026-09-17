@@ -40,6 +40,14 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(response, "User found"));
     }
 
+    @PutMapping("/me/interests")
+    public ResponseEntity<ApiResponse<UserInterestsResponse>> updateMyInterests(
+            @Valid @RequestBody UpdateInterestsRequest request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal UserPrincipal principal) {
+        UserInterestsResponse response = userService.updateInterests(principal.getUserId(), request.getInterests());
+        return ResponseEntity.ok(ApiResponse.success(response, "Interests updated"));
+    }
+
     private Long getCurrentUserId(HttpServletRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal) {

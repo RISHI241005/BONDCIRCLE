@@ -1,6 +1,7 @@
 package com.datingapp.chat.security;
 
 import java.util.Objects;
+import java.util.List;
 
 public class RegisterResponse {
 
@@ -9,15 +10,17 @@ public class RegisterResponse {
     private String email;
     private String fullName;
     private String phone;
+    private List<String> interests;
 
     public RegisterResponse() {}
 
-    public RegisterResponse(Long userId, String username, String email, String fullName, String phone) {
+    public RegisterResponse(Long userId, String username, String email, String fullName, String phone, List<String> interests) {
         this.userId = userId;
         this.username = username;
         this.email = email;
         this.fullName = fullName;
         this.phone = phone;
+        this.interests = interests;
     }
 
     public Long getUserId() {
@@ -60,6 +63,14 @@ public class RegisterResponse {
         this.phone = phone;
     }
 
+    public List<String> getInterests() {
+        return interests;
+    }
+
+    public void setInterests(List<String> interests) {
+        this.interests = interests;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -69,11 +80,12 @@ public class RegisterResponse {
                 Objects.equals(username, that.username) &&
                 Objects.equals(email, that.email) &&
                 Objects.equals(fullName, that.fullName) &&
-                Objects.equals(phone, that.phone);
+                Objects.equals(phone, that.phone) &&
+                Objects.equals(interests, that.interests);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(userId, username, email, fullName, phone);
+        return Objects.hash(userId, username, email, fullName, phone, interests);
     }
 }

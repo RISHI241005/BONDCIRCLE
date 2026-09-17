@@ -1,6 +1,7 @@
 package com.datingapp.chat.security;
 
 import java.util.Objects;
+import java.util.List;
 
 public class LoginResponse {
     private Long userId;
@@ -9,16 +10,18 @@ public class LoginResponse {
     private String fullName;
     private String phone;
     private String token;
+    private List<String> interests;
 
     public LoginResponse() {}
 
-    public LoginResponse(Long userId, String username, String email, String fullName, String phone, String token) {
+    public LoginResponse(Long userId, String username, String email, String fullName, String phone, String token, List<String> interests) {
         this.userId = userId;
         this.username = username;
         this.email = email;
         this.fullName = fullName;
         this.phone = phone;
         this.token = token;
+        this.interests = interests;
     }
 
     public Long getUserId() {
@@ -69,6 +72,14 @@ public class LoginResponse {
         this.token = token;
     }
 
+    public List<String> getInterests() {
+        return interests;
+    }
+
+    public void setInterests(List<String> interests) {
+        this.interests = interests;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -79,11 +90,12 @@ public class LoginResponse {
                 Objects.equals(email, that.email) &&
                 Objects.equals(fullName, that.fullName) &&
                 Objects.equals(phone, that.phone) &&
-                Objects.equals(token, that.token);
+                Objects.equals(token, that.token) &&
+                Objects.equals(interests, that.interests);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(userId, username, email, fullName, phone, token);
+        return Objects.hash(userId, username, email, fullName, phone, token, interests);
     }
 }

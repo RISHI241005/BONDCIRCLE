@@ -2,6 +2,9 @@ package com.datingapp.chat.security;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 @Entity
 @Table(name = "users", uniqueConstraints = {
@@ -25,6 +28,9 @@ public class User {
 
     @Column(name = "password_hash", nullable = false, length = 256)
     private String passwordHash;
+
+    @Column(name = "interests", length = 500)
+    private String interests;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -84,6 +90,20 @@ public class User {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public List<String> getInterestList() {
+        if (interests == null || interests.isBlank()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(interests.split("\\|"))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .toList();
+    }
+
+    public void setInterestList(List<String> interests) {
+        this.interests = interests == null || interests.isEmpty() ? null : String.join("|", interests);
     }
 
     public LocalDateTime getCreatedAt() {

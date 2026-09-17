@@ -25,6 +25,12 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             @Param("conversationId") Long conversationId,
             Pageable pageable);
 
+    default List<Message> findRecentMessages(Long conversationId, int limit) {
+        return findInitialMessagesByConversationId(
+                conversationId,
+                org.springframework.data.domain.PageRequest.of(0, limit));
+    }
+
     @Query("SELECT m FROM Message m LEFT JOIN FETCH m.replyTo " +
            "WHERE m.conversation.id = :conversationId " +
            "AND (m.createdAt < :cursorCreatedAt OR (m.createdAt = :cursorCreatedAt AND m.id < :cursorId)) " +
