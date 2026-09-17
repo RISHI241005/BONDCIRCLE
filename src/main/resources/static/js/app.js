@@ -19,6 +19,8 @@ const state = {
     moderationChecking: false,
     pendingModeratedMessage: null,
     coachLoadedFor: new Set(),
+    coachResponse: null,
+    coachVariant: 0,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -224,6 +226,8 @@ function logout(notify = true) {
     state.messages.clear();
     state.activeId = null;
     state.coachLoadedFor.clear();
+    state.coachResponse = null;
+    state.coachVariant = 0;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(PROFILE_KEY);
     chatView.hidden = true;
@@ -312,6 +316,8 @@ async function openConversation(conversation, moveToChat = true) {
     if (moveToChat) workspace.classList.add("is-chat-open");
     renderConversations();
     $("messageList").textContent = "";
+    state.coachResponse = null;
+    state.coachVariant = 0;
     closeIceBreakers();
 
     try {
@@ -420,7 +426,7 @@ async function loadIceBreakers(automatic = false) {
     loading.textContent = "Finding a natural way to keep things moving…";
     suggestions.appendChild(loading);
     try {
-        const response = await api(`/chats/${encodeURIComponent(conversationId)}/ice-breakers`);
+        const response = await api(`/chats/${encodeURIComponent(conversationId)}/ice-breakers?limit=16&variant=${state.coachVariant}`);
         if (state.activeId !== conversationId) return;
         renderIceBreakers(response);
     } catch (err) {
@@ -430,19 +436,57 @@ async function loadIceBreakers(automatic = false) {
 }
 
 function renderIceBreakers(response) {
+    state.coachResponse = response;
     $("iceBreakerGuidance").textContent = response?.guidance || "Pick an idea to add it to your message.";
+    const circleFilter = $("iceBreakerCircleFilter");
+    const selectedCircle = circleFilter.value;
+    circleFilter.textContent = "";
+    const allOption = document.createElement("option");
+    allOption.value = "ALL";
+    allOption.textContent = "All circles";
+    circleFilter.appendChild(allOption);
+    for (const circle of response?.circles || []) {
+        const option = document.createElement("option");
+        option.value = circle.code;
+        option.textContent = circle.label;
+        circleFilter.appendChild(option);
+    }
+    circleFilter.value = [...circleFilter.options].some((option) => option.value === selectedCircle) ? selectedCircle : "ALL";
+    renderFilteredIceBreakers();
+}
+
+function renderFilteredIceBreakers() {
     const container = $("iceBreakerSuggestions");
     container.textContent = "";
-    for (const suggestion of response?.suggestions || []) {
+    const circle = $("iceBreakerCircleFilter").value;
+    const tone = $("iceBreakerToneFilter").value;
+    const visibleSuggestions = (state.coachResponse?.suggestions || []).filter((suggestion) =>
+        (circle === "ALL" || suggestion.circle === circle) &&
+        (tone === "ALL" || suggestion.tone === tone));
+    if (!visibleSuggestions.length) {
+        const empty = document.createElement("p");
+        empty.className = "coach-loading";
+        empty.textContent = "No ideas match these filters. Try another circle or tone.";
+        container.appendChild(empty);
+        return;
+    }
+    for (const suggestion of visibleSuggestions) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "coach-suggestion";
         button.title = suggestion.reason || "Use this suggestion";
-        const topic = document.createElement("span");
-        topic.textContent = suggestion.topic || "Conversation idea";
+        const meta = document.createElement("div");
+        meta.className = "coach-suggestion-meta";
+        const circleLabel = document.createElement("span");
+        circleLabel.textContent = suggestion.circleLabel || suggestion.topic || "Conversation idea";
+        const toneLabel = document.createElement("span");
+        toneLabel.textContent = String(suggestion.tone || "").toLowerCase();
+        meta.append(circleLabel, toneLabel);
         const text = document.createElement("strong");
         text.textContent = suggestion.text;
-        button.append(topic, text);
+        const reason = document.createElement("small");
+        reason.textContent = suggestion.reason || "";
+        button.append(meta, text, reason);
         button.addEventListener("click", () => {
             $("messageInput").value = suggestion.text;
             resizeComposer();
@@ -889,8 +933,13 @@ $("iceBreakerButton").addEventListener("click", () => {
     if ($("iceBreakerPanel").hidden) loadIceBreakers(false);
     else closeIceBreakers();
 });
-$("refreshIceBreakers").addEventListener("click", () => loadIceBreakers(false));
+$("refreshIceBreakers").addEventListener("click", () => {
+    state.coachVariant += 1;
+    loadIceBreakers(false);
+});
 $("closeIceBreakers").addEventListener("click", closeIceBreakers);
+$("iceBreakerCircleFilter").addEventListener("change", renderFilteredIceBreakers);
+$("iceBreakerToneFilter").addEventListener("change", renderFilteredIceBreakers);
 $("interestsButton").addEventListener("click", openInterests);
 $("interestsClose").addEventListener("click", closeInterests);
 $("interestsForm").addEventListener("submit", saveInterests);

@@ -47,3 +47,8 @@ chat:
     max-length: 2000
     default-page-size: 30
     max-page-size: 100
+  icebreaker:
+    history-lookback: ${ICEBREAKER_HISTORY_LOOKBACK:80}
+    default-suggestions: ${ICEBREAKER_DEFAULT_SUGGESTIONS:12}
+    max-suggestions: ${ICEBREAKER_MAX_SUGGESTIONS:20}
+    quiet-after-hours: ${ICEBREAKER_QUIET_AFTER_HOURS:6}

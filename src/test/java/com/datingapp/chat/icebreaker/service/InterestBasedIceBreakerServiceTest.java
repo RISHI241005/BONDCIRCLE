@@ -1,12 +1,15 @@
 package com.datingapp.chat.icebreaker.service;
 
 import com.datingapp.chat.common.exception.ForbiddenException;
+import com.datingapp.chat.config.IceBreakerProperties;
 import com.datingapp.chat.conversation.entity.Conversation;
 import com.datingapp.chat.conversation.repository.ConversationParticipantRepository;
 import com.datingapp.chat.conversation.repository.ConversationRepository;
 import com.datingapp.chat.icebreaker.dto.IceBreakerResponse;
 import com.datingapp.chat.icebreaker.service.impl.InterestBasedIceBreakerService;
 import com.datingapp.chat.message.repository.MessageRepository;
+import com.datingapp.chat.message.entity.Message;
+import com.datingapp.chat.moderation.service.LanguageModerationService;
 import com.datingapp.chat.security.User;
 import com.datingapp.chat.security.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -39,11 +44,16 @@ class InterestBasedIceBreakerServiceTest {
 
     @BeforeEach
     void setUp() {
+        LanguageModerationService moderationService = new LanguageModerationService();
         service = new InterestBasedIceBreakerService(
                 conversationRepository,
                 participantRepository,
                 messageRepository,
-                userRepository);
+                userRepository,
+                new ConversationCircleRulesEngine(),
+                new ConversationSignalExtractor(moderationService),
+                moderationService,
+                new IceBreakerProperties());
     }
 
     @Test
@@ -59,14 +69,50 @@ class InterestBasedIceBreakerServiceTest {
         when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
         when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
         when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
-        when(messageRepository.findRecentMessages(44L, 12)).thenReturn(List.of());
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of());
 
         IceBreakerResponse response = service.getSuggestions("conversation-44", 1L);
 
         assertEquals("NEW_CONVERSATION", response.context());
         assertEquals(List.of("Travel"), response.sharedInterests());
-        assertEquals(3, response.suggestions().size());
-        assertTrue(response.suggestions().getFirst().text().contains("Travel"));
+        assertEquals(12, response.suggestions().size());
+        assertTrue(response.suggestions().stream().anyMatch(value -> value.text().contains("Travel")));
+        assertTrue(response.circles().stream().anyMatch(value -> value.code().equals("COMMON_GROUND")));
+
+        IceBreakerResponse playful = service.getSuggestions("conversation-44", 1L, 3, "PLAYFUL", 1);
+        assertEquals(3, playful.suggestions().size());
+        assertTrue(playful.suggestions().stream().allMatch(value -> value.tone().equals("PLAYFUL")));
+    }
+
+    @Test
+    void usesLatestMessageAndRepeatedPriorTopics() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Photography"));
+        Message latest = message(2L, "My photography trip was surprisingly eventful", Instant.now());
+        Message earlierMine = message(1L, "How is the trip planning going?", Instant.now().minus(1, ChronoUnit.DAYS));
+        Message earlierTheirs = message(2L, "The trip planning is almost done", Instant.now().minus(2, ChronoUnit.DAYS));
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(latest, earlierMine, earlierTheirs));
+
+        IceBreakerResponse response = service.getSuggestions("conversation-44", 1L, 16, "ALL", 0);
+
+        assertTrue(response.priorTopics().stream().anyMatch(value -> value.equalsIgnoreCase("trip")));
+        assertTrue(response.suggestions().stream().anyMatch(value -> value.circle().equals("DIRECT_REPLY")));
+        assertTrue(response.suggestions().stream().anyMatch(value -> value.circle().equals("CALLBACK")));
+
+        Message latestOutgoing = message(1L, "That sounds like a memorable trip", Instant.now().plusSeconds(1));
+        when(messageRepository.findRecentMessages(44L, 80))
+                .thenReturn(List.of(latestOutgoing, latest, earlierMine, earlierTheirs));
+        IceBreakerResponse afterReply = service.getSuggestions("conversation-44", 1L, 16, "ALL", 0);
+        assertTrue(afterReply.suggestions().stream().noneMatch(value -> value.circle().equals("DIRECT_REPLY")));
     }
 
     @Test
@@ -85,5 +131,13 @@ class InterestBasedIceBreakerServiceTest {
         user.setFullName(name);
         user.setInterestList(interests);
         return user;
+    }
+
+    private Message message(Long senderId, String content, Instant createdAt) {
+        Message message = new Message();
+        message.setSenderId(senderId);
+        message.setContent(content);
+        message.setCreatedAt(createdAt);
+        return message;
     }
 }

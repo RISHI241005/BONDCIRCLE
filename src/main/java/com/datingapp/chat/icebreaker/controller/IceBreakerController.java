@@ -13,6 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -28,11 +29,19 @@ public class IceBreakerController {
     }
 
     @GetMapping
-    @Operation(summary = "Suggest conversation starters", description = "Returns three private draft suggestions based on participant interests and recent conversation shape.")
+    @Operation(summary = "Suggest conversation drafts", description = "Returns ranked private drafts across conversation circles using recent chat history and participant interests.")
     public ResponseEntity<ApiResponse<IceBreakerResponse>> getSuggestions(
             @PathVariable String conversationId,
+            @RequestParam(defaultValue = "12") int limit,
+            @RequestParam(defaultValue = "ALL") String tone,
+            @RequestParam(defaultValue = "0") int variant,
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success(
-                iceBreakerService.getSuggestions(conversationId, principal.getUserId())));
+                iceBreakerService.getSuggestions(
+                        conversationId,
+                        principal.getUserId(),
+                        limit,
+                        tone,
+                        variant)));
     }
 }

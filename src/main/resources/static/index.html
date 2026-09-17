@@ -113,8 +113,12 @@
                     <div id="messageList" class="message-list" aria-live="polite" aria-label="Messages"></div>
                     <section id="iceBreakerPanel" class="coach-panel" aria-label="Conversation ideas" hidden>
                         <div class="coach-heading">
-                            <div><strong>A little conversation boost</strong><p id="iceBreakerGuidance">Pick an idea to add it to your message.</p></div>
+                            <div><strong>Circle suggestions</strong><p id="iceBreakerGuidance">Pick an idea to add it to your message.</p></div>
                             <div class="coach-actions"><button id="refreshIceBreakers" type="button" title="Refresh ideas" aria-label="Refresh ideas">↻</button><button id="closeIceBreakers" type="button" title="Close ideas" aria-label="Close ideas">×</button></div>
+                        </div>
+                        <div class="coach-filters">
+                            <label>Circle<select id="iceBreakerCircleFilter"><option value="ALL">All circles</option></select></label>
+                            <label>Tone<select id="iceBreakerToneFilter"><option value="ALL">All tones</option><option value="CURIOUS">Curious</option><option value="WARM">Warm</option><option value="PLAYFUL">Playful</option><option value="THOUGHTFUL">Thoughtful</option></select></label>
                         </div>
                         <div id="iceBreakerSuggestions" class="coach-suggestions"></div>
                     </section>

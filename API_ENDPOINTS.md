@@ -45,9 +45,9 @@
 | METHOD | URL | AUTH | REQUEST BODY | RESPONSE | ERROR RESPONSES | PURPOSE |
 |---|---|---|---|---|---|---|
 | PUT | `/api/v1/users/me/interests` | Yes | `{ "interests": ["Travel", "Music"] }` | `{ success: true, data: { interests: String[] } }` | 400, 401 | Replace the authenticated user's interests (maximum 10) |
-| GET | `/api/v1/chats/{conversationId}/ice-breakers` | Yes | - | `{ success: true, data: { conversationId, context, guidance, sharedInterests, suggestions } }` | 401, 403, 404 | Return three private, editable conversation suggestions based on interests and recent message shape |
+| GET | `/api/v1/chats/{conversationId}/ice-breakers` | Yes | - | `{ success: true, data: { conversationId, context, guidance, sharedInterests, priorTopics, circles, suggestions } }` | 401, 403, 404 | Return ranked private drafts based on prior chat topics and interests. Supports `limit` (1–20), `tone`, and `variant` query parameters |
 
-Ice-breaker suggestions are drafts only. The client places a selected suggestion in the composer so the user can edit and deliberately send it.
+Ice-breaker suggestions are drafts only. The client places a selected suggestion in the composer so the user can edit and deliberately send it. Supported tones are `ALL`, `CURIOUS`, `WARM`, `PLAYFUL`, and `THOUGHTFUL`.
 
 ### Presence
 
