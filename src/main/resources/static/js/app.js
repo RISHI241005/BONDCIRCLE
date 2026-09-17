@@ -212,6 +212,22 @@ async function enterChat() {
     $("profileAvatar").textContent = initials(state.profile?.fullName);
     connectRealtime();
     await loadConversations();
+
+    try {
+        const freshProfile = await api("/users/me");
+        if (freshProfile) {
+            state.profile = { ...state.profile, ...freshProfile };
+            localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
+            $("profileName").textContent = state.profile?.fullName || "Your account";
+            $("profilePhone").textContent = state.profile?.phone || "";
+            $("profileAvatar").textContent = initials(state.profile?.fullName);
+        }
+    } catch (err) {
+        if (err.status === 401) {
+            logout(false);
+            showToast("Your session expired. Please sign in again.", "error");
+        }
+    }
 }
 
 function logout(notify = true) {
@@ -368,8 +384,9 @@ function renderMessages() {
         meta.appendChild(time);
         if (mine) {
             const status = document.createElement("span");
-            status.className = "message-status";
-            status.textContent = message.pending ? "Sending" : formatStatus(message.status);
+            const statusKey = message.pending ? "sending" : String(message.status || "SENT").toLowerCase();
+            status.className = `message-status status-${statusKey}`;
+            status.textContent = message.pending ? "Sending…" : formatStatus(message.status);
             meta.appendChild(status);
         }
         row.append(bubble, meta);
@@ -901,8 +918,11 @@ function handleRealtimeEvent(event) {
         }
     } else if (event?.eventType === "MESSAGE_STATUS_UPDATE" && data) {
         const messages = state.messages.get(data.conversationId) || [];
-        const message = messages.find((item) => item.id === data.messageId);
-        if (message) message.status = data.status;
+        const message = messages.find((item) => item.id === data.messageId || item.publicId === data.messageId || item.clientMessageId === data.messageId);
+        if (message) {
+            message.status = data.status;
+            message.pending = false;
+        }
         if (data.conversationId === state.activeId) renderMessages();
     } else if (event?.eventType === "USER_TYPING" && data && data.conversationId === state.activeId && Number(data.userId) !== Number(state.profile?.userId)) {
         $("typingIndicator").hidden = !data.typing;
@@ -961,8 +981,15 @@ function clockTime(value) {
 }
 
 function formatStatus(status) {
-    const labels = { SENT: "Sent", DELIVERED: "Delivered", READ: "Read", EDITED: "Edited", DELETED: "Deleted", FAILED: "Failed" };
-    return labels[status] || "Sent";
+    const labels = {
+        SENT: "✓",
+        DELIVERED: "✓✓",
+        READ: "✓✓",
+        EDITED: "Edited",
+        DELETED: "Deleted",
+        FAILED: "⚠ Failed"
+    };
+    return labels[status] || "✓";
 }
 
 function focusPhoneSearch() {

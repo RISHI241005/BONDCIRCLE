@@ -32,6 +32,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -289,14 +290,22 @@ class CompleteE2EChatWorkflowTest extends AbstractMySQLIntegrationTest {
         // Extract message ID from MySQL
         // ============================================================
 
-        String messagePublicId =
-                jdbcTemplate.queryForObject(
-                        "SELECT public_id " +
-                        "FROM messages " +
-                        "WHERE client_message_id = 'e2e-msg-01'",
-                        String.class
-                );
+        AtomicReference<String> messagePublicIdRef = new AtomicReference<>();
+        await()
+                .atMost(Duration.ofSeconds(5))
+                .pollInterval(Duration.ofMillis(100))
+                .untilAsserted(() -> {
+                    String id = jdbcTemplate.queryForObject(
+                            "SELECT public_id " +
+                            "FROM messages " +
+                            "WHERE client_message_id = 'e2e-msg-01'",
+                            String.class
+                    );
+                    assertNotNull(id);
+                    messagePublicIdRef.set(id);
+                });
 
+        String messagePublicId = messagePublicIdRef.get();
         assertNotNull(messagePublicId);
 
 

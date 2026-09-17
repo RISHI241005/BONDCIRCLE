@@ -40,6 +40,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(response, "User found"));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal UserPrincipal principal) {
+        UserProfileResponse response = userService.getProfile(principal.getUserId());
+        return ResponseEntity.ok(ApiResponse.success(response, "Profile retrieved"));
+    }
+
     @PutMapping("/me/interests")
     public ResponseEntity<ApiResponse<UserInterestsResponse>> updateMyInterests(
             @Valid @RequestBody UpdateInterestsRequest request,

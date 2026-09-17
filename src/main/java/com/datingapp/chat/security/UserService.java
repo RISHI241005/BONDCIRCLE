@@ -95,6 +95,20 @@ public class UserService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public UserProfileResponse getProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+        return new UserProfileResponse(
+                user.getId(),
+                String.valueOf(user.getId()),
+                user.getEmail(),
+                user.getFullName(),
+                user.getPhone(),
+                user.getInterestList()
+        );
+    }
+
     @Transactional
     public UserInterestsResponse updateInterests(Long userId, List<String> interests) {
         User user = userRepository.findById(userId)

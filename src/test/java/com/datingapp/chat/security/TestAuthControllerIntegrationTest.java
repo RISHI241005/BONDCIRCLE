@@ -36,4 +36,23 @@ class TestAuthControllerIntegrationTest extends AbstractMySQLIntegrationTest {
                 .andExpect(jsonPath("$.token").isString())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"));
     }
+
+    @Test
+    @DisplayName("Should retrieve current user profile via GET /api/v1/users/me with valid token")
+    void testGetMyProfileEndpoint() throws Exception {
+        TestAuthController.TokenRequest request = new TestAuthController.TokenRequest(101L, List.of("ROLE_USER"));
+        String tokenJson = mockMvc.perform(post("/test/auth/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String token = objectMapper.readTree(tokenJson).get("token").asText();
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.userId").value(101))
+                .andExpect(jsonPath("$.data.fullName").value("Alex Rivera"));
+    }
 }
