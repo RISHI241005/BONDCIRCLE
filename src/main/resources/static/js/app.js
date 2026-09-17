@@ -376,6 +376,7 @@ function renderMessages() {
         const bubble = document.createElement("div");
         bubble.className = "message-bubble";
         bubble.textContent = message.deleted ? "This message was deleted." : message.content;
+        bubble.setAttribute("data-raw-content", bubble.textContent);
         const meta = document.createElement("div");
         meta.className = "message-meta";
         const time = document.createElement("time");
@@ -808,7 +809,16 @@ function resizeComposer() {
     input.style.height = "auto";
     input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
     $("characterCount").textContent = `${input.value.length} / 2000`;
-    $("sendButton").disabled = !input.value.trim();
+    const hasText = Boolean(input.value.trim());
+    const sendBtn = $("sendButton");
+    const voiceBtn = $("voiceNoteButton");
+    if (sendBtn) {
+        sendBtn.disabled = !hasText;
+        sendBtn.hidden = !hasText;
+    }
+    if (voiceBtn) {
+        voiceBtn.hidden = hasText;
+    }
 }
 
 function handleComposerInput() {
@@ -1006,10 +1016,300 @@ $("registerTab").addEventListener("click", () => switchAuthTab("register"));
 $("loginForm").addEventListener("submit", handleLogin);
 $("registerForm").addEventListener("submit", handleRegister);
 $("logoutButton").addEventListener("click", () => logout());
+function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+}
+
+// -----------------------------------------------------------------------------
+// WHATSAPP & TELEGRAM SERVICES & CONTROLS
+// -----------------------------------------------------------------------------
+
+function handleGoBack() {
+    if (window.innerWidth <= 680 || workspace?.classList.contains("is-chat-open")) {
+        workspace?.classList.remove("is-chat-open");
+    } else {
+        // Desktop back button: close the active chat and show start screen
+        state.activeId = null;
+        $("emptyConversation").hidden = false;
+        $("activeConversation").hidden = true;
+        workspace?.classList.remove("is-chat-open");
+        renderConversations();
+        closeIceBreakers();
+        closeChatSearch();
+        closeChatDropdown();
+    }
+}
+
+// In-Chat Search
+function toggleChatSearch() {
+    const overlay = $("chatSearchOverlay");
+    if (!overlay) return;
+    overlay.hidden = !overlay.hidden;
+    if (!overlay.hidden) {
+        $("chatSearchInput").value = "";
+        $("chatSearchMatches").textContent = "";
+        $("chatSearchInput").focus();
+    } else {
+        closeChatSearch();
+    }
+}
+
+function closeChatSearch() {
+    const overlay = $("chatSearchOverlay");
+    if (overlay) overlay.hidden = true;
+    const input = $("chatSearchInput");
+    if (input) input.value = "";
+    const matches = $("chatSearchMatches");
+    if (matches) matches.textContent = "";
+    renderMessages();
+}
+
+function handleInChatSearch() {
+    const query = ($("chatSearchInput")?.value || "").trim().toLowerCase();
+    if (!query) {
+        $("chatSearchMatches").textContent = "";
+        renderMessages();
+        return;
+    }
+    const messageEls = $("messageList").querySelectorAll(".message-bubble");
+    let matchCount = 0;
+    let firstMatchEl = null;
+
+    messageEls.forEach((bubble) => {
+        const text = bubble.getAttribute("data-raw-content") || bubble.textContent || "";
+        const lower = text.toLowerCase();
+        if (lower.includes(query)) {
+            matchCount++;
+            const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi");
+            bubble.innerHTML = escapeHtml(text).replace(regex, '<mark class="chat-highlight">$1</mark>');
+            bubble.closest(".message").style.display = "";
+            if (!firstMatchEl) firstMatchEl = bubble;
+        } else {
+            bubble.textContent = text;
+            bubble.closest(".message").style.display = "none";
+        }
+    });
+
+    $("chatSearchMatches").textContent = `${matchCount} ${matchCount === 1 ? "match" : "matches"}`;
+    if (firstMatchEl) {
+        firstMatchEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+}
+
+// Audio / Video Calling
+let callTimerInterval = null;
+let callDurationSec = 0;
+
+function startCall(isVideo = false) {
+    const activeConv = state.conversations.find((c) => c.conversationId === state.activeId);
+    const name = activeConv?.otherUserName || activeConv?.otherUserPhone || $("chatName").textContent || "User";
+
+    $("callContactName").textContent = name;
+    $("callAvatar").textContent = initials(name);
+    $("callTypeIcon").textContent = isVideo ? "📹" : "📞";
+    $("callTypeLabel").textContent = isVideo ? "BondCircle Video" : "BondCircle Audio";
+    $("callStatusText").textContent = "Ringing…";
+    $("callModal").hidden = false;
+
+    clearInterval(callTimerInterval);
+    callDurationSec = 0;
+
+    // Simulate connection after 2.2 seconds
+    callTimerInterval = setTimeout(() => {
+        $("callStatusText").textContent = "Connected · 00:00";
+        callTimerInterval = setInterval(() => {
+            callDurationSec++;
+            const mins = String(Math.floor(callDurationSec / 60)).padStart(2, "0");
+            const secs = String(callDurationSec % 60).padStart(2, "0");
+            $("callStatusText").textContent = `Connected · ${mins}:${secs}`;
+        }, 1000);
+    }, 2200);
+}
+
+function endCall() {
+    clearInterval(callTimerInterval);
+    $("callStatusText").textContent = "Call ended";
+    setTimeout(() => {
+        $("callModal").hidden = true;
+        showToast("Call ended", "info");
+    }, 500);
+}
+
+// Header Menu Dropdown & Contact Info
+function toggleChatDropdown() {
+    const dropdown = $("chatMenuDropdown");
+    if (dropdown) dropdown.hidden = !dropdown.hidden;
+}
+
+function closeChatDropdown() {
+    const dropdown = $("chatMenuDropdown");
+    if (dropdown) dropdown.hidden = true;
+}
+
+function openContactInfo() {
+    const activeConv = state.conversations.find((c) => c.conversationId === state.activeId);
+    const name = activeConv?.otherUserName || activeConv?.otherUserPhone || $("chatName").textContent || "Conversation";
+    $("infoContactName").textContent = name;
+    $("infoContactAvatar").textContent = initials(name);
+    $("infoContactPhone").textContent = activeConv?.otherUserPhone || "Private number";
+    $("contactInfoModal").hidden = false;
+    closeChatDropdown();
+}
+
+function closeContactInfo() {
+    $("contactInfoModal").hidden = true;
+}
+
+// Quick Emoji Drawer
+function toggleEmojiDrawer() {
+    const drawer = $("emojiDrawer");
+    if (!drawer) return;
+    drawer.hidden = !drawer.hidden;
+    $("attachmentMenu").hidden = true;
+}
+
+function insertEmoji(emoji) {
+    const input = $("messageInput");
+    const start = input.selectionStart || input.value.length;
+    const end = input.selectionEnd || input.value.length;
+    input.value = input.value.substring(0, start) + emoji + input.value.substring(end);
+    input.selectionStart = input.selectionEnd = start + emoji.length;
+    input.focus();
+    handleComposerInput();
+}
+
+// Attachment Menu
+function toggleAttachmentMenu() {
+    const menu = $("attachmentMenu");
+    if (!menu) return;
+    menu.hidden = !menu.hidden;
+    $("emojiDrawer").hidden = true;
+}
+
+function handleAttachment(type) {
+    $("attachmentMenu").hidden = true;
+    if (type === "photo" || type === "document") {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        if (type === "photo") fileInput.accept = "image/*,video/*";
+        fileInput.onchange = () => {
+            if (fileInput.files?.length) {
+                const file = fileInput.files[0];
+                const placeholder = type === "photo" ? `📷 [Photo: ${file.name}]` : `📄 [Document: ${file.name}]`;
+                $("messageInput").value += ($("messageInput").value ? " " : "") + placeholder;
+                handleComposerInput();
+                showToast(`Attached ${file.name}`);
+            }
+        };
+        fileInput.click();
+    } else if (type === "contact") {
+        $("messageInput").value += ($("messageInput").value ? " " : "") + `👤 [Contact: ${$("chatName").textContent}]`;
+        handleComposerInput();
+    } else if (type === "poll") {
+        $("messageInput").value += ($("messageInput").value ? " " : "") + `📊 [Poll: What time works best?]`;
+        handleComposerInput();
+    }
+}
+
+// Voice Note Recording Simulation
+let isRecordingVoice = false;
+function handleVoiceNote() {
+    if (!isRecordingVoice) {
+        isRecordingVoice = true;
+        showToast("🎙️ Recording audio message... Tap again to send", "info");
+        $("voiceNoteButton").style.background = "linear-gradient(180deg, #ef4444, #dc2626)";
+    } else {
+        isRecordingVoice = false;
+        $("voiceNoteButton").style.background = "";
+        const seconds = Math.floor(Math.random() * 8) + 3;
+        performSend(`🎙️ Voice message (0:0${seconds})`, false);
+        showToast("Voice message sent!", "info");
+    }
+}
+
+function toggleMinimizeIceBreakers() {
+    const panel = $("iceBreakerPanel");
+    if (panel) panel.classList.toggle("is-minimized");
+}
+
+$("loginTab").addEventListener("click", () => switchAuthTab("login"));
+$("registerTab").addEventListener("click", () => switchAuthTab("register"));
+$("loginForm").addEventListener("submit", handleLogin);
+$("registerForm").addEventListener("submit", handleRegister);
+$("logoutButton").addEventListener("click", () => logout());
 $("peopleSearchForm").addEventListener("submit", handleSearch);
 $("focusSearchButton").addEventListener("click", focusPhoneSearch);
 $("emptySearchButton").addEventListener("click", focusPhoneSearch);
-$("mobileBackButton").addEventListener("click", () => workspace.classList.remove("is-chat-open"));
+
+// Go Back button (Desktop and Mobile)
+$("chatBackButton")?.addEventListener("click", handleGoBack);
+$("mobileBackButton")?.addEventListener("click", handleGoBack);
+
+// In-chat search
+$("chatSearchBtn")?.addEventListener("click", toggleChatSearch);
+$("chatSearchInput")?.addEventListener("input", handleInChatSearch);
+$("closeChatSearch")?.addEventListener("click", closeChatSearch);
+
+// Audio & Video calls
+$("voiceCallBtn")?.addEventListener("click", () => startCall(false));
+$("videoCallBtn")?.addEventListener("click", () => startCall(true));
+$("endCallBtn")?.addEventListener("click", endCall);
+$("callToggleMute")?.addEventListener("click", (e) => e.currentTarget.classList.toggle("is-active"));
+$("callToggleSpeaker")?.addEventListener("click", (e) => e.currentTarget.classList.toggle("is-active"));
+
+// Header options dropdown & contact info
+$("chatMenuBtn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleChatDropdown();
+});
+$("menuContactInfo")?.addEventListener("click", openContactInfo);
+$("contactInfoClose")?.addEventListener("click", closeContactInfo);
+$("closeContactInfoBtn")?.addEventListener("click", closeContactInfo);
+$("chatAvatar")?.addEventListener("click", openContactInfo);
+$("chatName")?.addEventListener("click", openContactInfo);
+
+$("menuMute")?.addEventListener("click", () => {
+    closeChatDropdown();
+    showToast("Notifications muted for this chat", "info");
+});
+$("menuClearChat")?.addEventListener("click", () => {
+    closeChatDropdown();
+    if (state.activeId) {
+        state.messages.set(state.activeId, []);
+        renderMessages();
+        showToast("Chat cleared", "info");
+    }
+});
+$("menuBlock")?.addEventListener("click", () => {
+    closeChatDropdown();
+    showToast("User blocked", "error");
+});
+
+// Composer tools
+$("emojiButton")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleEmojiDrawer();
+});
+$("closeEmojiDrawer")?.addEventListener("click", () => {
+    const drawer = $("emojiDrawer");
+    if (drawer) drawer.hidden = true;
+});
+document.querySelectorAll(".emoji-btn").forEach((btn) => {
+    btn.addEventListener("click", () => insertEmoji(btn.getAttribute("data-emoji")));
+});
+
+$("attachButton")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleAttachmentMenu();
+});
+document.querySelectorAll(".attach-item").forEach((btn) => {
+    btn.addEventListener("click", () => handleAttachment(btn.getAttribute("data-type")));
+});
+
+$("voiceNoteButton")?.addEventListener("click", handleVoiceNote);
+
 $("messageForm").addEventListener("submit", sendMessage);
 $("messageInput").addEventListener("input", handleComposerInput);
 $("messageInput").addEventListener("keydown", (event) => {
@@ -1018,12 +1318,14 @@ $("messageInput").addEventListener("keydown", (event) => {
         $("messageForm").requestSubmit();
     }
 });
+
 $("moderationClose").addEventListener("click", closeModerationWarning);
 $("moderationEdit").addEventListener("click", closeModerationWarning);
 $("moderationSendAnyway").addEventListener("click", () => sendModeratedMessage().catch((err) => showToast(err.message, "error")));
 $("moderationModal").addEventListener("click", (event) => {
     if (event.target === $("moderationModal")) closeModerationWarning();
 });
+
 $("iceBreakerButton").addEventListener("click", () => {
     if ($("iceBreakerPanel").hidden) loadIceBreakers(false);
     else closeIceBreakers();
@@ -1033,6 +1335,7 @@ $("refreshIceBreakers").addEventListener("click", () => {
     loadIceBreakers(false);
 });
 $("closeIceBreakers").addEventListener("click", closeIceBreakers);
+$("minimizeIceBreakers")?.addEventListener("click", toggleMinimizeIceBreakers);
 
 $("modeUnableToTalk")?.addEventListener("click", () => {
     state.coachMode = "UNABLE_TO_TALK";
@@ -1080,15 +1383,36 @@ $("langHinglish")?.addEventListener("click", () => {
     state.coachVariant = 0;
     loadIceBreakers(false);
 });
+
 $("interestsButton").addEventListener("click", openInterests);
 $("interestsClose").addEventListener("click", closeInterests);
 $("interestsForm").addEventListener("submit", saveInterests);
 $("interestsModal").addEventListener("click", (event) => {
     if (event.target === $("interestsModal")) closeInterests();
 });
+
+// Close popups on outside click
+document.addEventListener("click", (event) => {
+    const menuDropdown = $("chatMenuDropdown");
+    if (menuDropdown && !menuDropdown.hidden && !event.target.closest(".chat-menu-wrapper")) {
+        closeChatDropdown();
+    }
+    const emojiDrawer = $("emojiDrawer");
+    if (emojiDrawer && !emojiDrawer.hidden && !event.target.closest("#emojiDrawer") && !event.target.closest("#emojiButton")) {
+        emojiDrawer.hidden = true;
+    }
+    const attachMenu = $("attachmentMenu");
+    if (attachMenu && !attachMenu.hidden && !event.target.closest("#attachmentMenu") && !event.target.closest("#attachButton")) {
+        attachMenu.hidden = true;
+    }
+});
+
 document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !$("moderationModal").hidden) closeModerationWarning();
     if (event.key === "Escape" && !$("interestsModal").hidden) closeInterests();
+    if (event.key === "Escape" && !$("callModal").hidden) endCall();
+    if (event.key === "Escape" && !$("contactInfoModal").hidden) closeContactInfo();
+    if (event.key === "Escape" && !$("chatSearchOverlay").hidden) closeChatSearch();
 });
 
 if (state.token && state.profile) enterChat();

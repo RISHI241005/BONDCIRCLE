@@ -6,15 +6,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.http.CacheControl;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * Web MVC Configuration configuring Cross-Origin Resource Sharing (CORS)
- * for mobile clients, web admin panels, and Swagger UI.
- * 
- * CORS is profile-aware: development uses permissive origins, production
- * uses specific allowed origins with credentials.
+ * for mobile clients, web admin panels, and Swagger UI, as well as static asset cache-control.
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
@@ -44,5 +43,12 @@ public class WebConfig implements WebMvcConfigurer {
         } else if (allowedOrigins.length > 0) {
             mapping.allowedOrigins(allowedOrigins).allowCredentials(true);
         }
+    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/**")
+                .addResourceLocations("classpath:/static/")
+                .setCacheControl(CacheControl.noCache().mustRevalidate());
     }
 }
