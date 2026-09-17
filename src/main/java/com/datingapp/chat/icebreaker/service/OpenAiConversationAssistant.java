@@ -147,30 +147,32 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
         String modeInstruction = switch (mode) {
             case "UNABLE_TO_TALK" -> """
                 The user is currently UNABLE TO TALK, BUSY, IN A MEETING, OR OCCUPIED.
-                Prioritize polite, warm, natural holding replies that acknowledge the other person's message and explain they are caught up/busy right now and will get back to them later.
-                Make sure these sound completely natural and respectful so the other person does not feel ignored or ghosted.
+                CRITICAL: Do NOT write generic canned replies like 'I am busy right now'.
+                Instead, craft smart, warm, personalized holding replies that directly acknowledge what the other person specifically mentioned or asked, reassure them with your mood, and set an easy expectation for when you can talk.
                 """;
-            case "AUTOPILOT" -> "Write exactly one ready-to-send reply in the user's voice.";
-            case "WRITE_FOR_ME" -> "Write polished ready-to-send drafts in the user's voice.";
-            default -> "Create distinct, natural reply options the user can choose from.";
+            case "AUTOPILOT" -> "Write exactly one ready-to-send reply in the user's voice tailored to their exact mood and situation.";
+            case "WRITE_FOR_ME" -> "Write polished ready-to-send drafts tailored directly to the specific talk and mood.";
+            default -> "Create distinct, bespoke reply options tailored to the exact conversational context and mood.";
         };
 
         return """
-                You are BondCircle's intelligent conversation assistant and dating/social chat advisor.
-                Analyze the supplied recent conversation context, messages, and interests.
+                You are BondCircle's intelligent conversation analyst and dating/social copilot.
+                Deeply analyze the supplied conversation context, messages, and emotional dynamics.
                 
                 You must output valid JSON with this exact structure:
                 {
+                  "detectedMood": "Short label of the conversation vibe (e.g., 'Playful & Teasing', 'Exhausted & Venting', 'Flirtatious & Warm', 'Excited', 'Making Plans', 'Late-night & Cozy', 'Reflective & Sincere')",
+                  "conversationScenario": "1-2 sharp sentences analyzing what is actually happening beneath the surface, the other person's intent/vibe, and the relationship dynamics.",
                   "shouldReply": "RECOMMENDED" | "OPTIONAL" | "NO_RUSH",
                   "urgency": "HIGH" | "MEDIUM" | "LOW",
-                  "decisionReason": "Concise 1-2 sentence assessment of whether and why the user should reply, analyzing the other person's last message.",
+                  "decisionReason": "Concise 1-2 sentence assessment of whether and why the user should reply, analyzing the other person's last message and mood.",
                   "replyTiming": "Suggested time frame (e.g. 'Within 1-2 hours', 'Whenever free', 'No rush')",
-                  "guidance": "A warm, helpful tip on navigating this chat.",
+                  "guidance": "A sharp, strategic tip on how to match or steer the conversation mood.",
                   "replies": [
                     {
-                      "text": "The reply message draft",
-                      "topic": "Short topic label (1-3 words)",
-                      "reason": "Why this message works well in this context",
+                      "text": "The custom-tailored reply message draft",
+                      "topic": "Specific subject or context referenced",
+                      "reason": "Why this specific reply fits their mood and advances the scenario",
                       "circle": "DIRECT_REPLY" | "CALLBACK" | "COMMON_GROUND" | "DISCOVERY" | "LIGHT_TOUCH",
                       "tone": "CURIOUS" | "WARM" | "PLAYFUL" | "THOUGHTFUL",
                       "language": "ENGLISH" | "HINGLISH"
@@ -178,17 +180,15 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
                   ]
                 }
                 
-                Guidelines for Decision:
-                - shouldReply: If they asked a direct question or sent an eager message, RECOMMENDED with HIGH or MEDIUM urgency. If they sent a closing remark (good night, ok, etc.), OPTIONAL or NO_RUSH with LOW urgency. If the user sent the last message and is awaiting a reply, NO_RUSH.
-                
-                Guidelines for Replies:
-                %s
-                - Requested language: %s. For AUTO, naturally match the recent chat: use English for English conversations and comfortable Roman-script Hinglish when the chat contains Hindi or Hinglish. If ambiguous, provide a mix of English and Hinglish.
-                - Requested tone: %s. ALL means vary tones naturally.
-                - Return %d reply option(s).
-                - Keep each message concise, warm, relaxed, human, context-aware, and easy to continue.
-                - Do not invent false facts, meetings, promises, or shared memories not in the chat.
-                - Do not manipulate, harass, or sexualize. Never mention being an AI.
+                CRITICAL INTELLIGENCE & ACCURACY RULES:
+                1. NO CANNED OR GENERIC TEMPLATES: Under no circumstances generate formulaic prompts (such as 'What part of it has been on your mind most?' or 'I would love to hear more about X').
+                2. Bespoke customization: Every single reply MUST directly refer to the specific nouns, verbs, topics, inside jokes, or sentiments they actually mentioned in the chat.
+                3. Mood Alignment: The replies must feel alive and human. If they are playful, reply with witty banter. If they had a rough/hectic day, reply with genuine warmth. If making plans, give concrete engaging answers.
+                4. UNABLE TO TALK: When user is busy, acknowledge their specific message before stating you are tied up.
+                5. Requested language: %s. For AUTO, naturally match the recent chat: use English for English conversations and comfortable Roman-script Hinglish when the chat contains Hindi or Hinglish. If ambiguous, provide a mix.
+                6. Requested tone: %s. ALL means vary tones naturally.
+                7. Return %d reply option(s).
+                8. Never sound robotic. Never mention being an AI.
                 """.formatted(modeInstruction, language, tone, count);
     }
 
@@ -224,6 +224,8 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
         replySchema.put("required", List.of("text", "topic", "reason", "circle", "tone", "language"));
 
         Map<String, Object> rootProperties = new LinkedHashMap<>();
+        rootProperties.put("detectedMood", Map.of("type", "string", "minLength", 1, "maxLength", 100));
+        rootProperties.put("conversationScenario", Map.of("type", "string", "minLength", 1, "maxLength", 300));
         rootProperties.put("shouldReply", Map.of("type", "string", "enum", List.of("RECOMMENDED", "OPTIONAL", "NO_RUSH")));
         rootProperties.put("urgency", Map.of("type", "string", "enum", List.of("HIGH", "MEDIUM", "LOW")));
         rootProperties.put("decisionReason", Map.of("type", "string", "minLength", 1, "maxLength", 300));
@@ -239,7 +241,7 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
         schema.put("type", "object");
         schema.put("additionalProperties", false);
         schema.put("properties", rootProperties);
-        schema.put("required", List.of("guidance", "replies"));
+        schema.put("required", List.of("detectedMood", "conversationScenario", "guidance", "replies"));
         return schema;
     }
 
@@ -270,7 +272,7 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
                     replies.add(new Reply(
                             text,
                             node.path("topic").asText("Conversation"),
-                            node.path("reason").asText("Generated by AI assistant."),
+                            node.path("reason").asText("Custom tailored to conversation mood."),
                             node.path("circle").asText("LIGHT_TOUCH"),
                             node.path("tone").asText("WARM"),
                             node.path("language").asText("ENGLISH")));
@@ -280,11 +282,13 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
                 return Optional.empty();
             }
 
-            String guidance = result.path("guidance").asText("Choose a reply that sounds like you.");
+            String guidance = result.path("guidance").asText("Choose a reply that matches your vibe.");
             String shouldReply = result.path("shouldReply").asText("RECOMMENDED");
             String urgency = result.path("urgency").asText("MEDIUM");
             String decisionReason = result.path("decisionReason").asText(guidance);
             String replyTiming = result.path("replyTiming").asText("Whenever you're ready");
+            String detectedMood = result.path("detectedMood").asText("Casual & Engaging");
+            String conversationScenario = result.path("conversationScenario").asText("Active dialogue between participants.");
 
             return Optional.of(new ReplyBatch(
                     guidance,
@@ -292,7 +296,9 @@ public class OpenAiConversationAssistant implements LiveConversationAssistant {
                     shouldReply,
                     urgency,
                     decisionReason,
-                    replyTiming));
+                    replyTiming,
+                    detectedMood,
+                    conversationScenario));
         } catch (Exception exception) {
             log.warn("AI response did not match the expected schema: {}", exception.getMessage());
             return Optional.empty();

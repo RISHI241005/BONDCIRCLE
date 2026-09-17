@@ -234,6 +234,81 @@ class InterestBasedIceBreakerServiceTest {
         assertTrue(response.suggestions().stream().anyMatch(s -> s.text().toLowerCase().contains("caught up") || s.text().toLowerCase().contains("busy") || s.text().toLowerCase().contains("tied up")));
     }
 
+    @Test
+    void analyzesMoodAndScenarioInOfflineMode() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Photography"));
+        Message tiredMessage = message(2L, "Today was such an exhausting and hectic day, totally drained", Instant.now());
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(tiredMessage));
+
+        IceBreakerResponse response = service.getSuggestions("conversation-44", 1L);
+
+        assertEquals("Exhausted & Stressed", response.detectedMood());
+        assertTrue(response.conversationScenario().toLowerCase().contains("tired") || response.conversationScenario().toLowerCase().contains("venting"));
+        // Assert suggested messages are customized and not canned
+        assertTrue(response.suggestions().stream().anyMatch(s -> s.text().toLowerCase().contains("draining") || s.text().toLowerCase().contains("unwind") || s.text().toLowerCase().contains("breath") || s.text().toLowerCase().contains("evening")));
+    }
+
+    @Test
+    void preservesMoodAndScenarioFromLiveAssistant() {
+        Conversation conversation = new Conversation();
+        conversation.setId(44L);
+        conversation.setPublicId("conversation-44");
+        User currentUser = user(1L, "Asha", List.of("Travel"));
+        User otherUser = user(2L, "Ravi", List.of("Photography"));
+        Message latest = message(2L, "Haha you wish! Let's see who wins tomorrow", Instant.now());
+
+        when(conversationRepository.findByPublicId("conversation-44")).thenReturn(Optional.of(conversation));
+        when(participantRepository.existsByConversation_PublicIdAndUserId("conversation-44", 1L)).thenReturn(true);
+        when(participantRepository.findOtherParticipantUserIds("conversation-44", 1L)).thenReturn(List.of(2L));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(messageRepository.findRecentMessages(44L, 80)).thenReturn(List.of(latest));
+
+        LanguageModerationService moderationService = new LanguageModerationService();
+        service = new InterestBasedIceBreakerService(
+                conversationRepository,
+                participantRepository,
+                messageRepository,
+                userRepository,
+                new ConversationCircleRulesEngine(),
+                new ConversationSignalExtractor(moderationService),
+                moderationService,
+                new IceBreakerProperties(),
+                new AiAssistantProperties(),
+                request -> Optional.of(new LiveConversationAssistant.ReplyBatch(
+                        "Keep the playful banter going and challenge them back.",
+                        List.of(new LiveConversationAssistant.Reply(
+                                "Oh it is definitely on! Loser gets the winner dessert? 😏",
+                                "Playful bet",
+                                "Custom witty response to their challenge.",
+                                "PLAYFUL",
+                                "PLAYFUL",
+                                "ENGLISH")),
+                        "RECOMMENDED",
+                        "MEDIUM",
+                        "High playful energy, keep the banter active.",
+                        "Within 10-15 minutes",
+                        "Playful & Teasing",
+                        "Playful challenge and banter back-and-forth")));
+
+        IceBreakerResponse response = service.getSuggestions("conversation-44", 1L);
+
+        assertEquals("Playful & Teasing", response.detectedMood());
+        assertEquals("Playful challenge and banter back-and-forth", response.conversationScenario());
+        assertEquals("Within 10-15 minutes", response.replyTiming());
+        assertEquals("Oh it is definitely on! Loser gets the winner dessert? 😏", response.suggestions().getFirst().text());
+    }
+
     private User user(Long id, String name, List<String> interests) {
         User user = new User();
         user.setId(id);

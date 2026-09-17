@@ -472,6 +472,16 @@ function renderIceBreakers(response) {
         guidanceEl.textContent = response?.guidance || "Smart suggestions & advice based on this conversation.";
     }
 
+    const moodEl = $("aiDetectedMood");
+    if (moodEl) {
+        moodEl.textContent = response?.detectedMood || "Casual & Natural";
+    }
+
+    const scenarioEl = $("aiScenarioSummary");
+    if (scenarioEl) {
+        scenarioEl.textContent = response?.conversationScenario || "Active conversation flow";
+    }
+
     const verdictEl = $("aiReplyVerdict");
     const urgencyEl = $("aiUrgencyBadge");
     const reasonEl = $("aiDecisionReason");
@@ -542,6 +552,7 @@ function renderIceBreakers(response) {
 function updateAiToolbarStates() {
     $("modeUnableToTalk")?.classList.toggle("is-active", state.coachMode === "UNABLE_TO_TALK");
     $("modeSuggest")?.classList.toggle("is-active", state.coachMode === "SUGGEST" && state.coachTone === "ALL");
+    $("modeWarm")?.classList.toggle("is-active", state.coachTone === "WARM");
     $("modePlayful")?.classList.toggle("is-active", state.coachTone === "PLAYFUL");
     $("modeThoughtful")?.classList.toggle("is-active", state.coachTone === "THOUGHTFUL");
 
@@ -1001,6 +1012,12 @@ $("modeUnableToTalk")?.addEventListener("click", () => {
 $("modeSuggest")?.addEventListener("click", () => {
     state.coachMode = "SUGGEST";
     state.coachTone = "ALL";
+    state.coachVariant = 0;
+    loadIceBreakers(false);
+});
+$("modeWarm")?.addEventListener("click", () => {
+    state.coachMode = "SUGGEST";
+    state.coachTone = "WARM";
     state.coachVariant = 0;
     loadIceBreakers(false);
 });

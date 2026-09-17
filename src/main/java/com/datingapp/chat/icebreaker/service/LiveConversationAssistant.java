@@ -39,9 +39,21 @@ public interface LiveConversationAssistant {
             String shouldReply,
             String urgency,
             String decisionReason,
-            String replyTiming) {
+            String replyTiming,
+            String detectedMood,
+            String conversationScenario) {
+        public ReplyBatch(
+                String guidance,
+                List<Reply> replies,
+                String shouldReply,
+                String urgency,
+                String decisionReason,
+                String replyTiming) {
+            this(guidance, replies, shouldReply, urgency, decisionReason, replyTiming, "Casual & Natural", "General flow");
+        }
+
         public ReplyBatch(String guidance, List<Reply> replies) {
-            this(guidance, replies, "RECOMMENDED", "MEDIUM", guidance, "Whenever you're ready");
+            this(guidance, replies, "RECOMMENDED", "MEDIUM", guidance, "Whenever you're ready", "Casual & Natural", "General flow");
         }
     }
 }

@@ -181,6 +181,11 @@ button { cursor: pointer; }
 .ai-verdict-badge.verdict-optional { background: #fff8e6; color: #9c6c0e; border: 1px solid #fde7b0; }
 .ai-verdict-badge.verdict-no-rush { background: #eef2f8; color: #4e5a75; border: 1px solid #d6deea; }
 .ai-urgency-badge { padding: .14rem .4rem; border-radius: 6px; font-size: .58rem; font-weight: 700; text-transform: uppercase; background: #f0f2f9; color: #646d87; }
+.ai-intelligence-meta { display: flex; flex-direction: column; gap: .35rem; margin-bottom: .6rem; padding: .45rem .6rem; border-radius: 10px; background: linear-gradient(135deg, #f8f9ff, #f3f5fe); border: 1px dashed #dbe0fa; }
+.ai-meta-item { display: flex; align-items: baseline; gap: .45rem; flex-wrap: wrap; }
+.ai-meta-label { font-size: .68rem; font-weight: 800; color: #525a7c; text-transform: uppercase; letter-spacing: .02em; }
+.ai-mood-badge { display: inline-flex; align-items: center; padding: .12rem .5rem; border-radius: 999px; font-size: .7rem; font-weight: 800; color: #5a2bb8; background: #efe8ff; border: 1px solid #dccefd; }
+.ai-scenario-badge { font-size: .72rem; font-weight: 600; color: #2e3556; line-height: 1.35; }
 .ai-advice-reason { margin: 0 0 .4rem; color: #272d45; font-size: .76rem; line-height: 1.45; font-weight: 500; }
 .ai-timing-row { display: flex; align-items: center; gap: .35rem; font-size: .68rem; color: #5f6885; }
 .ai-timing-label { font-weight: 700; color: #404868; }
@@ -194,6 +199,8 @@ button { cursor: pointer; }
 .ai-mode-pill.is-active, .ai-lang-pill.is-active { background: #4856df; border-color: #4856df; color: white; box-shadow: 0 2px 8px rgba(72, 86, 223, .25); }
 .ai-mode-pill[data-mode="UNABLE_TO_TALK"] { border-color: #f7d1bc; color: #a4481c; background: #fffaf7; }
 .ai-mode-pill[data-mode="UNABLE_TO_TALK"].is-active { background: #e05e26; border-color: #e05e26; color: white; box-shadow: 0 2px 8px rgba(224, 94, 38, .3); }
+.ai-mode-pill[data-tone="WARM"] { border-color: #f7cedb; color: #a4204c; background: #fff8fa; }
+.ai-mode-pill[data-tone="WARM"].is-active { background: #e02662; border-color: #e02662; color: white; box-shadow: 0 2px 8px rgba(224, 38, 98, .3); }
 .coach-suggestions { display: flex; gap: .55rem; overflow-x: auto; padding-bottom: .2rem; }
 .coach-suggestion { min-width: min(290px, 80vw); padding: .78rem .88rem; border: 1px solid #dde0fb; border-radius: 13px; color: #323950; background: white; text-align: left; box-shadow: 0 4px 14px rgba(37,49,105,.05); cursor: pointer; transition: all .15s ease; }
 .coach-suggestion:hover { border-color: #929eff; transform: translateY(-2px); box-shadow: 0 6px 18px rgba(37,49,105,.09); }

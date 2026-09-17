@@ -129,10 +129,23 @@
                         <!-- Should I reply? AI Advisor Card -->
                         <div id="aiAdviceCard" class="ai-advice-card">
                             <div class="ai-advice-header">
-                                <span class="ai-advice-eyebrow">Should you reply?</span>
+                                <span class="ai-advice-eyebrow">Conversation Advisor</span>
                                 <span id="aiReplyVerdict" class="ai-verdict-badge">Analyzing…</span>
                                 <span id="aiUrgencyBadge" class="ai-urgency-badge"></span>
                             </div>
+
+                            <!-- Mood & Scenario Analysis -->
+                            <div class="ai-intelligence-meta">
+                                <div class="ai-meta-item">
+                                    <span class="ai-meta-label">🎭 Detected Mood:</span>
+                                    <span id="aiDetectedMood" class="ai-mood-badge">Analyzing vibe…</span>
+                                </div>
+                                <div class="ai-meta-item">
+                                    <span class="ai-meta-label">🔍 Scenario:</span>
+                                    <span id="aiScenarioSummary" class="ai-scenario-badge">Reading context…</span>
+                                </div>
+                            </div>
+
                             <p id="aiDecisionReason" class="ai-advice-reason">Reading chat context…</p>
                             <div id="aiTimingWrapper" class="ai-timing-row">
                                 <span class="ai-timing-label">⏱️ Timing:</span>
@@ -142,11 +155,12 @@
 
                         <!-- Situation / Mode selection -->
                         <div class="ai-modes-bar" role="toolbar" aria-label="Conversation situation">
-                            <span class="ai-modes-label">Situation:</span>
-                            <button id="modeUnableToTalk" class="ai-mode-pill" type="button" data-mode="UNABLE_TO_TALK">🏃 Unable to talk / Busy</button>
-                            <button id="modeSuggest" class="ai-mode-pill is-active" type="button" data-mode="SUGGEST">💬 Smart reply</button>
-                            <button id="modePlayful" class="ai-mode-pill" type="button" data-tone="PLAYFUL">😄 Playful</button>
-                            <button id="modeThoughtful" class="ai-mode-pill" type="button" data-tone="THOUGHTFUL">💡 Deep</button>
+                            <span class="ai-modes-label">Vibe &amp; Mode:</span>
+                            <button id="modeUnableToTalk" class="ai-mode-pill" type="button" data-mode="UNABLE_TO_TALK" title="Send a polite holding reply without being rude">🏃 Unable to talk / Busy</button>
+                            <button id="modeSuggest" class="ai-mode-pill is-active" type="button" data-mode="SUGGEST" title="Auto-match the mood and context">💬 Smart reply</button>
+                            <button id="modeWarm" class="ai-mode-pill" type="button" data-tone="WARM" title="Warm and flirty replies">❤️ Warm &amp; Flirty</button>
+                            <button id="modePlayful" class="ai-mode-pill" type="button" data-tone="PLAYFUL" title="Teasing and witty replies">😄 Playful</button>
+                            <button id="modeThoughtful" class="ai-mode-pill" type="button" data-tone="THOUGHTFUL" title="Thoughtful and deep replies">💡 Deep</button>
                         </div>
 
                         <!-- Language toggle -->

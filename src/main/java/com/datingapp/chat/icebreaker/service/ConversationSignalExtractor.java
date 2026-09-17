@@ -87,7 +87,78 @@ public class ConversationSignalExtractor {
                 .limit(8)
                 .toList();
 
-        return new ConversationSignals(latestTopic, priorTopics);
+        String incomingText = latestIncoming.map(Message::getContent).orElse("");
+        boolean isQuestion = isQuestion(incomingText);
+        String detectedMood = detectMood(messages, incomingText);
+        String scenarioSummary = describeScenario(messages, currentUserId, incomingText, detectedMood, latestTopic);
+
+        return new ConversationSignals(
+                latestTopic,
+                priorTopics,
+                detectedMood,
+                scenarioSummary,
+                latestIncoming.map(Message::getContent),
+                isQuestion);
+    }
+
+    private String detectMood(List<Message> messages, String latestText) {
+        String combined = messages.stream()
+                .limit(5)
+                .map(m -> m.getContent() == null ? "" : m.getContent().toLowerCase(Locale.ROOT))
+                .reduce("", (a, b) -> a + " " + b)
+                + " " + latestText.toLowerCase(Locale.ROOT);
+
+        if (combined.matches(".*\\b(hectic|tired|thak|exhausted|deadline|stress|headache|bura din|fasa|kaam|work|office)\\b.*")) {
+            return "Exhausted & Stressed";
+        }
+        if (combined.matches(".*\\b(haha|lmao|lol|rofl|kidding|joke|masti|pagal|funny|mzaak|😂|🤣|😄|😜)\\b.*")) {
+            return "Playful & Teasing";
+        }
+        if (combined.matches(".*\\b(cute|handsome|beautiful|sweet|miss you|coffee|date|dinner|meet|milte|romance|❤️|😍|blush)\\b.*")) {
+            return "Flirtatious & Warm";
+        }
+        if (combined.matches(".*\\b(trip|travel|excited|can't wait|super|awesome|party|concert|shandar|badhiya|🔥|🎉)\\b.*")) {
+            return "Excited & Enthusiastic";
+        }
+        if (combined.matches(".*\\b(night|sleepy|bed|neend|soja|thak gaya|goodnight|gn|chalo bye)\\b.*")) {
+            return "Late-night & Cozy";
+        }
+        if (combined.matches(".*\\b(feel|life|think|deep|sach|heart|sad|upset|advice|bura|problem|alone)\\b.*")) {
+            return "Reflective & Sincere";
+        }
+        return "Casual & Engaging";
+    }
+
+    private String describeScenario(
+            List<Message> messages,
+            Long currentUserId,
+            String incomingText,
+            String mood,
+            Optional<String> topic) {
+        if (messages.isEmpty()) {
+            return "Brand new conversation; opening with warmth and mutual discovery.";
+        }
+        boolean isIncoming = !incomingText.isBlank();
+        if (!isIncoming) {
+            return "Waiting on their response; giving comfortable breathing room.";
+        }
+        String topicName = topic.orElse("recent chat");
+        return switch (mood) {
+            case "Exhausted & Stressed" -> "They are tired or venting about " + topicName + "; an empathetic, supportive reply creates safety.";
+            case "Playful & Teasing" -> "Banter-heavy dynamic; matching their witty, teasing vibe builds instant chemistry.";
+            case "Flirtatious & Warm" -> "Flirtatious undertones; charming and attentive replies will deepen the spark.";
+            case "Excited & Enthusiastic" -> "High energy regarding " + topicName + "; leaning into their excitement keeps the momentum vibrant.";
+            case "Late-night & Cozy" -> "Winding down late at night; gentle, soothing, low-pressure warmth fits best.";
+            case "Reflective & Sincere" -> "A meaningful, deeper exchange; authentic listening and thoughtfulness is key.";
+            default -> isQuestion(incomingText)
+                    ? "They asked a direct question regarding " + topicName + "; an engaging answer advances the dialogue."
+                    : "Natural conversation flow around " + topicName + "; maintain effortless, two-way engagement.";
+        };
+    }
+
+    private boolean isQuestion(String text) {
+        return text != null && (text.contains("?") || text.toLowerCase(Locale.ROOT)
+                .matches(".*\\b(what|when|where|why|how|who|kya|kab|kaise|free|plan|batao)\\b.*"));
     }
 
     private Optional<String> bestTopic(String content, List<String> knownInterests) {
@@ -121,8 +192,15 @@ public class ConversationSignalExtractor {
 
     public record ConversationSignals(
             Optional<String> latestIncomingTopic,
-            List<String> priorTopics
+            List<String> priorTopics,
+            String detectedMood,
+            String scenarioSummary,
+            Optional<String> latestIncomingText,
+            boolean isQuestion
     ) {
+        public ConversationSignals(Optional<String> latestIncomingTopic, List<String> priorTopics) {
+            this(latestIncomingTopic, priorTopics, "Casual & Engaging", "General conversation flow", Optional.empty(), false);
+        }
     }
 
     private static final class TopicStats {

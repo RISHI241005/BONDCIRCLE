@@ -182,7 +182,9 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                         batch.shouldReply(),
                         batch.urgency(),
                         batch.decisionReason(),
-                        batch.replyTiming());
+                        batch.replyTiming(),
+                        batch.detectedMood(),
+                        batch.conversationScenario());
             }
         }
 
@@ -201,6 +203,11 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 .filter(toneFilter)
                 .filter(suggestion -> !moderationService.analyze(suggestion.text()).flagged())
                 .toList();
+        if (eligible.isEmpty() && !tone.equals("ALL")) {
+            eligible = deduplicate(pool).stream()
+                    .filter(suggestion -> !moderationService.analyze(suggestion.text()).flagged())
+                    .toList();
+        }
         List<IceBreakerSuggestion> selected = selectAcrossCircles(
                 eligible,
                 safeLimit,
@@ -220,7 +227,9 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 decision.shouldReply(),
                 decision.urgency(),
                 decision.reason(),
-                decision.timing());
+                decision.timing(),
+                signals.detectedMood(),
+                signals.scenarioSummary());
     }
 
     private LiveConversationAssistant.GenerationRequest buildLiveRequest(
@@ -261,6 +270,17 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
     }
 
     private List<IceBreakerSuggestion> mapLiveSuggestions(
+            List<LiveConversationAssistant.Reply> replies,
+            String requestedTone,
+            int limit) {
+        List<IceBreakerSuggestion> result = mapLiveSuggestionsInternal(replies, requestedTone, limit);
+        if (result.isEmpty() && !requestedTone.equals("ALL")) {
+            return mapLiveSuggestionsInternal(replies, "ALL", limit);
+        }
+        return result;
+    }
+
+    private List<IceBreakerSuggestion> mapLiveSuggestionsInternal(
             List<LiveConversationAssistant.Reply> replies,
             String requestedTone,
             int limit) {
@@ -309,7 +329,9 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
             String shouldReply,
             String urgency,
             String decisionReason,
-            String replyTiming) {
+            String replyTiming,
+            String detectedMood,
+            String conversationScenario) {
         Set<String> includedCircles = suggestions.stream()
                 .map(IceBreakerSuggestion::circle)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
@@ -332,7 +354,9 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 shouldReply,
                 urgency,
                 decisionReason,
-                replyTiming);
+                replyTiming,
+                detectedMood,
+                conversationScenario);
     }
 
     private record ReplyDecision(String shouldReply, String urgency, String reason, String timing) {}
@@ -440,10 +464,10 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         List<IceBreakerSuggestion> result = new ArrayList<>();
 
         if ("UNABLE_TO_TALK".equals(mode)) {
-            addUnableToTalkSuggestions(result, language);
+            addUnableToTalkSuggestions(result, language, signals);
         }
 
-        signals.latestIncomingTopic().ifPresent(topic -> addDirectReplySuggestions(result, topic, context));
+        signals.latestIncomingTopic().ifPresent(topic -> addDirectReplySuggestions(result, topic, context, signals));
         signals.priorTopics().stream().limit(5).forEach(topic -> addCallbackSuggestions(result, topic, context));
         shared.stream().limit(4).forEach(interest -> addSharedInterestSuggestions(result, interest, context));
 
@@ -459,101 +483,182 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
         return result;
     }
 
-    private void addUnableToTalkSuggestions(List<IceBreakerSuggestion> result, String language) {
+    private void addUnableToTalkSuggestions(
+            List<IceBreakerSuggestion> result,
+            String language,
+            ConversationSignalExtractor.ConversationSignals signals) {
         boolean includeHinglish = "HINGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
         boolean includeEnglish = "ENGLISH".equalsIgnoreCase(language) || "AUTO".equalsIgnoreCase(language);
 
+        String topic = signals.latestIncomingTopic().map(this::displayTopic).orElse("");
+        String mood = signals.detectedMood();
+        boolean hasTopic = !topic.isBlank();
+        boolean isQuestion = signals.isQuestion();
+
         if (includeEnglish) {
+            if (isQuestion) {
+                String questionTarget = hasTopic ? " about " + topic : "";
+                result.add(new IceBreakerSuggestion(
+                        "Saw your message" + questionTarget + "! A bit tied up right now, will reply with full details as soon as I get a breather 😊",
+                        hasTopic ? topic : "Question",
+                        "Directly acknowledges their specific question while explaining you are tied up.",
+                        "DIRECT_REPLY",
+                        circleRules.get("DIRECT_REPLY").label(),
+                        "WARM",
+                        99,
+                        "ENGLISH",
+                        false));
+            } else if (hasTopic) {
+                result.add(new IceBreakerSuggestion(
+                        "Caught up with something right now, but saw what you said about " + topic + "! Let's talk about it once I'm free 🙌",
+                        topic,
+                        "Shows you saw their specific message about " + topic + ".",
+                        "DIRECT_REPLY",
+                        circleRules.get("DIRECT_REPLY").label(),
+                        "WARM",
+                        98,
+                        "ENGLISH",
+                        false));
+            }
+
+            if ("Exhausted & Stressed".equals(mood)) {
+                result.add(new IceBreakerSuggestion(
+                        "Hey, in meetings/working right now, but sounds like you've had quite a demanding day! Get some rest, texting you tonight.",
+                        "Demanding day",
+                        "Empathizes with their fatigue while setting expectations.",
+                        "DIRECT_REPLY",
+                        circleRules.get("DIRECT_REPLY").label(),
+                        "WARM",
+                        96,
+                        "ENGLISH",
+                        false));
+            } else if ("Playful & Teasing".equals(mood)) {
+                result.add(new IceBreakerSuggestion(
+                        "Haha can't chat right this second! Don't start without me, texting you back shortly 😄",
+                        "Banter holding",
+                        "Maintains their playful vibe while explaining you are tied up.",
+                        "LIGHT_TOUCH",
+                        circleRules.get("LIGHT_TOUCH").label(),
+                        "PLAYFUL",
+                        95,
+                        "ENGLISH",
+                        false));
+            }
+
             result.add(new IceBreakerSuggestion(
-                    "Hey! Caught up in something right now, will reply properly in a bit! 🙌",
+                    "Hey! Caught up in something right now, but will get back to you properly in a bit 🙌",
                     "Busy right now",
-                    "Quick, warm acknowledgment so they know you saw their message.",
+                    "Warm holding reply so they don't feel left on read.",
                     "DIRECT_REPLY",
                     circleRules.get("DIRECT_REPLY").label(),
                     "WARM",
-                    98,
+                    94,
                     "ENGLISH",
                     false));
-            result.add(new IceBreakerSuggestion(
-                    "In the middle of work right now, but will get back to you later tonight 😊",
-                    "Work / Meeting",
-                    "Sets clear expectations without breaking the connection.",
-                    "DIRECT_REPLY",
-                    circleRules.get("DIRECT_REPLY").label(),
-                    "WARM",
-                    95,
-                    "ENGLISH",
-                    false));
+
             result.add(new IceBreakerSuggestion(
                     "Can't chat at the moment, but let's definitely catch up once I'm free!",
                     "Can't talk now",
-                    "Keeps the energy positive while giving you time.",
+                    "Keeps the energy positive while giving you breathing space.",
                     "LIGHT_TOUCH",
                     circleRules.get("LIGHT_TOUCH").label(),
                     "PLAYFUL",
-                    92,
-                    "ENGLISH",
-                    false));
-            result.add(new IceBreakerSuggestion(
-                    "A bit tied up today! Saw your text and will reply as soon as I get a break.",
-                    "Tied up",
-                    "Reassures them you will reply when you have a moment.",
-                    "DIRECT_REPLY",
-                    circleRules.get("DIRECT_REPLY").label(),
-                    "THOUGHTFUL",
                     90,
                     "ENGLISH",
                     false));
         }
 
         if (includeHinglish) {
-            result.add(new IceBreakerSuggestion(
-                    "Thoda busy hoon abhi, free hote hi text karta hoon! 🙌",
-                    "Busy right now",
-                    "Polite and clear update so they know you're tied up.",
-                    "DIRECT_REPLY",
-                    circleRules.get("DIRECT_REPLY").label(),
-                    "WARM",
-                    97,
-                    "HINGLISH",
-                    false));
-            result.add(new IceBreakerSuggestion(
-                    "Abhi thoda kaam mein fasa hoon, shaam ko aaram se reply karta hoon 😊",
-                    "Kaam mein busy",
-                    "Sets expectations on when you will be free.",
-                    "DIRECT_REPLY",
-                    circleRules.get("DIRECT_REPLY").label(),
-                    "WARM",
-                    94,
-                    "HINGLISH",
-                    false));
-            result.add(new IceBreakerSuggestion(
-                    "Saw your message! Abhi chat nahi kar sakta, thodi der mein baat karte hain.",
-                    "Quick update",
-                    "Acknowledges their text without ghosting.",
-                    "LIGHT_TOUCH",
-                    circleRules.get("LIGHT_TOUCH").label(),
-                    "PLAYFUL",
-                    91,
-                    "HINGLISH",
-                    false));
+            if (hasTopic) {
+                result.add(new IceBreakerSuggestion(
+                        "Thoda busy hoon abhi! " + topic + " wala text dekha, free hote hi aaram se baat karta hoon 🙌",
+                        topic,
+                        topic + " ko reference karke holding message banaya gaya hai.",
+                        "DIRECT_REPLY",
+                        circleRules.get("DIRECT_REPLY").label(),
+                        "WARM",
+                        98,
+                        "HINGLISH",
+                        false));
+            }
+
+            if ("Exhausted & Stressed".equals(mood)) {
+                result.add(new IceBreakerSuggestion(
+                        "Abhi kaam mein thoda fasa hoon, par tum rest karo abhi! Free hote hi call/text karta hoon 😊",
+                        "Kaam / Stress",
+                        "Unke mood ko samajh kar empathic holding reply.",
+                        "DIRECT_REPLY",
+                        circleRules.get("DIRECT_REPLY").label(),
+                        "WARM",
+                        96,
+                        "HINGLISH",
+                        false));
+            } else {
+                result.add(new IceBreakerSuggestion(
+                        "Thoda sa busy hoon abhi, shaam ko free hote hi text karta hoon! 🙌",
+                        "Quick update",
+                        "Seedha aur polite message bina ghost kare.",
+                        "LIGHT_TOUCH",
+                        circleRules.get("LIGHT_TOUCH").label(),
+                        "WARM",
+                        93,
+                        "HINGLISH",
+                        false));
+            }
         }
     }
 
-    private void addDirectReplySuggestions(List<IceBreakerSuggestion> result, String rawTopic, String context) {
+    private void addDirectReplySuggestions(
+            List<IceBreakerSuggestion> result,
+            String rawTopic,
+            String context,
+            ConversationSignalExtractor.ConversationSignals signals) {
         String topic = displayTopic(rawTopic);
-        add(result, "DIRECT_REPLY", "CURIOUS", topic,
-                "You mentioned " + topic + " — what part of it has been on your mind most?",
-                "Uses a concrete signal from their latest message.", context, 4);
-        add(result, "DIRECT_REPLY", "WARM", topic,
-                "I’d like to hear more about " + topic + ". What happened next?",
-                "Acknowledges what they just shared and invites a fuller answer.", context, 3);
-        add(result, "DIRECT_REPLY", "PLAYFUL", topic,
-                topic + " sounds like there’s a story there 😄 What’s the full version?",
-                "Keeps the reply light while staying connected to their message.", context, 2);
-        add(result, "DIRECT_REPLY", "THOUGHTFUL", topic,
-                "What has " + topic + " taught you recently?",
-                "Turns their latest topic into a more meaningful conversation.", context, 1);
+        String mood = signals.detectedMood();
+
+        if ("Playful & Teasing".equals(mood)) {
+            add(result, "DIRECT_REPLY", "PLAYFUL", topic,
+                    "Wait, are you seriously telling me about " + topic + " right now? 😄 Tell me the full story!",
+                    "Matches their witty, playful mood with matching banter.", context, 5);
+            add(result, "DIRECT_REPLY", "WARM", topic,
+                    topic + " sounds like there's definitely more here than you're letting on 😉",
+                    "Leans into their lighthearted teasing tone.", context, 4);
+        } else if ("Exhausted & Stressed".equals(mood)) {
+            add(result, "DIRECT_REPLY", "WARM", topic,
+                    "Oof, " + topic + " sounds like it was completely draining. Did you at least get a chance to unwind?",
+                    "Validates their stress with empathetic care.", context, 5);
+            add(result, "DIRECT_REPLY", "THOUGHTFUL", topic,
+                    "Take a deep breath! Don't let " + topic + " ruin your whole evening.",
+                    "Provides calm, supportive reassurance.", context, 4);
+        } else if ("Excited & Enthusiastic".equals(mood)) {
+            add(result, "DIRECT_REPLY", "CURIOUS", topic,
+                    "Love the excitement around " + topic + "! What was the absolute highlight?",
+                    "Matches their high energy with genuine curiosity.", context, 5);
+            add(result, "DIRECT_REPLY", "WARM", topic,
+                    "That energy about " + topic + " is infectious! Tell me everything 😄",
+                    "Keeps the vibrant conversation flowing.", context, 4);
+        } else if ("Flirtatious & Warm".equals(mood)) {
+            add(result, "DIRECT_REPLY", "PLAYFUL", topic,
+                    "Now that's a charming way to talk about " + topic + " 😉",
+                    "Deepens the romantic/flirty spark.", context, 5);
+            add(result, "DIRECT_REPLY", "WARM", topic,
+                    "You bringing up " + topic + " just made my day a whole lot brighter 😊",
+                    "Warm, affectionate acknowledgment.", context, 4);
+        } else if (signals.isQuestion()) {
+            add(result, "DIRECT_REPLY", "CURIOUS", topic,
+                    "Regarding " + topic + " — that's such an interesting question! What made you ask?",
+                    "Answers their question by exploring the curiosity behind it.", context, 5);
+            add(result, "DIRECT_REPLY", "WARM", topic,
+                    "I’d love to answer that about " + topic + ". Let me tell you how it went!",
+                    "Directly addresses their inquiry with open engagement.", context, 4);
+        } else {
+            add(result, "DIRECT_REPLY", "CURIOUS", topic,
+                    "I was really curious about how " + topic + " turned out for you!",
+                    "Engages directly with what they just shared.", context, 4);
+            add(result, "DIRECT_REPLY", "WARM", topic,
+                    "I'd love to hear more about " + topic + ". What happened next?",
+                    "Invites a fuller, richer response.", context, 3);
+        }
     }
 
     private void addCallbackSuggestions(List<IceBreakerSuggestion> result, String rawTopic, String context) {
