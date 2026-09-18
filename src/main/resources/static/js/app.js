@@ -258,9 +258,16 @@ function logout(notify = true) {
     state.conversations = [];
     state.messages.clear();
     state.activeId = null;
-    state.coachLoadedFor.clear();
-    state.coachResponse = null;
-    state.coachVariant = 0;
+    state.replyCoach = {
+        visible: false,
+        loading: false,
+        suggestions: [],
+        rejectedIds: [],
+        rejectedTexts: [],
+        activeConversationId: null
+    };
+    const coachPanel = $("aiReplyCoachPanel");
+    if (coachPanel) coachPanel.hidden = true;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(PROFILE_KEY);
     chatView.hidden = true;
@@ -690,7 +697,7 @@ async function saveInterests(event) {
         });
         state.profile.interests = response.interests || interests;
         localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
-        state.coachLoadedFor.clear();
+        state.replyCoach.suggestions = [];
         closeInterests();
         showToast("Your interests have been updated.");
     } catch (err) {
@@ -1089,11 +1096,7 @@ function focusPhoneSearch() {
     $("peopleSearchInput").focus();
 }
 
-$("loginTab").addEventListener("click", () => switchAuthTab("login"));
-$("registerTab").addEventListener("click", () => switchAuthTab("register"));
-$("loginForm").addEventListener("submit", handleLogin);
-$("registerForm").addEventListener("submit", handleRegister);
-$("logoutButton").addEventListener("click", () => logout());
+
 function escapeHtml(str) {
     const div = document.createElement("div");
     div.textContent = str || "";
