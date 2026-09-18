@@ -10,8 +10,19 @@ public record ConversationContext(
         Long partnerUserId,
         String currentUserInterests,
         String partnerInterests,
-        List<ContextMessage> messages
+        List<ContextMessage> messages,
+        List<String> longTermMemories
 ) {
+    public ConversationContext(
+            String conversationId,
+            Long currentUserId,
+            Long partnerUserId,
+            String currentUserInterests,
+            String partnerInterests,
+            List<ContextMessage> messages) {
+        this(conversationId, currentUserId, partnerUserId, currentUserInterests, partnerInterests, messages, Collections.emptyList());
+    }
+
     public ConversationContext(
             String conversationId,
             Long currentUserId,
@@ -19,7 +30,7 @@ public record ConversationContext(
             List<ContextMessage> messages,
             String currentUserInterests,
             String partnerInterests) {
-        this(conversationId, currentUserId, partnerUserId, currentUserInterests, partnerInterests, messages);
+        this(conversationId, currentUserId, partnerUserId, currentUserInterests, partnerInterests, messages, Collections.emptyList());
     }
 
     public record ContextMessage(

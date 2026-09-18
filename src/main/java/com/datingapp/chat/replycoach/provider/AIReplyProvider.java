@@ -5,8 +5,10 @@ import com.datingapp.chat.replycoach.dto.ConversationStateDto;
 import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
 import com.datingapp.chat.replycoach.model.ConversationAnalysis;
 import com.datingapp.chat.replycoach.model.ConversationContext;
+import com.datingapp.chat.replycoach.model.ConversationEnvironment;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import com.datingapp.chat.replycoach.service.ReplyCoachPromptBuilder;
+import com.datingapp.chat.replycoach.service.ReplyIntentPlanner;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -76,7 +78,61 @@ public class AIReplyProvider {
     }
 
     /**
-     * Advanced generation method using rich domain models and structured prompt builder.
+     * Generation method using rich ConversationEnvironment and planned intents.
+     */
+    public Optional<GenerationResult> generateSuggestions(
+            ConversationContext context,
+            ConversationEnvironment env,
+            UserWritingProfile styleProfile,
+            List<ReplyIntentPlanner.PlannedIntent> plannedIntents,
+            List<String> rejectedTexts,
+            int limit) {
+
+        if (!isConfigured()) {
+            log.info("AI Provider is not enabled or API key is not configured.");
+            return Optional.empty();
+        }
+
+        int targetCount = Math.max(1, Math.min(limit, 3));
+        String apiKey = properties.getApiKey().trim();
+        String baseUrl = normalizeBaseUrl(properties.getBaseUrl());
+        String model = properties.getModel() != null && !properties.getModel().isBlank()
+                ? properties.getModel().trim()
+                : "openai/gpt-oss-20b";
+
+        String systemPrompt = promptBuilder.buildSystemPrompt(targetCount, env, styleProfile, plannedIntents);
+        String userPrompt = promptBuilder.buildUserPrompt(context, env, rejectedTexts);
+
+        try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("model", model);
+            body.put("messages", List.of(
+                    Map.of("role", "system", "content", systemPrompt),
+                    Map.of("role", "user", "content", userPrompt)
+            ));
+            body.put("response_format", Map.of("type", "json_object"));
+            body.put("max_tokens", 800);
+            body.put("temperature", 0.7);
+
+            String uri = baseUrl.endsWith("/chat/completions") ? "" : "/chat/completions";
+            JsonNode response = defaultRestClient.post()
+                    .uri(uri)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Authorization", "Bearer " + apiKey)
+                    .body(body)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            return parseAiResponse(response, targetCount, env != null ? ConversationAnalysis.fromEnvironment(env) : null);
+        } catch (Exception ex) {
+            log.warn("AI Reply Coach generation failed via {}: {}. Falling back to internal engine.",
+                    baseUrl, ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Backward-compatible generation method using ConversationAnalysis.
      */
     public Optional<GenerationResult> generateSuggestions(
             ConversationContext context,
@@ -317,23 +373,41 @@ public class AIReplyProvider {
                 return Optional.empty();
             }
 
+            JsonNode envNode = root.path("conversationEnvironment");
+            JsonNode srcNode = envNode.isObject() ? envNode : root;
+
             String defaultStage = analysis != null ? analysis.stage().name() : "CASUAL";
             boolean defaultHasQuestion = analysis != null && analysis.hasUnansweredQuestion();
             String defaultQuestionText = analysis != null ? analysis.lastQuestionText() : null;
 
-            String stage = root.hasNonNull("stage") ? root.path("stage").asText(defaultStage) : defaultStage;
-            boolean hasQuestion = root.hasNonNull("hasUnansweredQuestion") ? root.path("hasUnansweredQuestion").asBoolean(defaultHasQuestion) : defaultHasQuestion;
-            String questionText = root.hasNonNull("unansweredQuestionText") ? root.path("unansweredQuestionText").asText(defaultQuestionText) : defaultQuestionText;
+            String stage = srcNode.hasNonNull("stage") ? srcNode.path("stage").asText(defaultStage) : defaultStage;
+            boolean hasQuestion = srcNode.hasNonNull("hasUnansweredQuestion") ? srcNode.path("hasUnansweredQuestion").asBoolean(defaultHasQuestion) : defaultHasQuestion;
+            String questionText = srcNode.hasNonNull("unansweredQuestionText") ? srcNode.path("unansweredQuestionText").asText(defaultQuestionText) : defaultQuestionText;
+
+            String topic = srcNode.hasNonNull("topic") ? srcNode.path("topic").asText(analysis != null ? analysis.primaryTopic() : "Chat") : (analysis != null ? analysis.primaryTopic() : "Chat");
+            String tone = srcNode.hasNonNull("tone") ? srcNode.path("tone").asText(analysis != null ? analysis.tone() : "Friendly") : (analysis != null ? analysis.tone() : "Friendly");
+            String engagement = srcNode.hasNonNull("engagement") ? srcNode.path("engagement").asText(analysis != null && analysis.isDry() ? "DRY" : "BALANCED") : (analysis != null && analysis.isDry() ? "DRY" : "BALANCED");
+            String language = srcNode.hasNonNull("language") ? srcNode.path("language").asText(analysis != null ? analysis.language() : "ENGLISH") : (analysis != null ? analysis.language() : "ENGLISH");
+            boolean dry = srcNode.hasNonNull("dry") ? srcNode.path("dry").asBoolean(analysis != null && analysis.isDry()) : (analysis != null && analysis.isDry());
+
+            String momentum = srcNode.hasNonNull("momentum") ? srcNode.path("momentum").asText("HIGH") : (analysis != null ? analysis.momentum().name() : "HIGH");
+            String direction = srcNode.hasNonNull("direction") ? srcNode.path("direction").asText("CONTINUING_TOPIC") : "CONTINUING_TOPIC";
+            String responseExpectation = srcNode.hasNonNull("responseExpectation") ? srcNode.path("responseExpectation").asText("FOLLOW_UP_NEEDED") : "FOLLOW_UP_NEEDED";
+            String depth = srcNode.hasNonNull("depth") ? srcNode.path("depth").asText("PERSONAL") : "PERSONAL";
 
             ConversationStateDto state = new ConversationStateDto(
-                    root.path("topic").asText(analysis != null ? analysis.primaryTopic() : "Chat"),
-                    root.path("tone").asText(analysis != null ? analysis.tone() : "Friendly"),
-                    root.path("engagement").asText(analysis != null && analysis.isDry() ? "DRY" : "BALANCED"),
-                    root.path("language").asText(analysis != null ? analysis.language() : "ENGLISH"),
-                    root.path("dry").asBoolean(analysis != null && analysis.isDry()),
+                    topic,
+                    tone,
+                    engagement,
+                    language,
+                    dry,
                     stage,
                     hasQuestion,
-                    questionText
+                    questionText,
+                    momentum,
+                    direction,
+                    responseExpectation,
+                    depth
             );
 
             return Optional.of(new GenerationResult(items, state));
