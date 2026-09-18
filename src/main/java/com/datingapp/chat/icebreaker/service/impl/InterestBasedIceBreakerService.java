@@ -26,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -799,27 +801,11 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
     }
 
     private void addSharedInterestSuggestions(List<IceBreakerSuggestion> result, String interest, String context) {
-        add(result, "COMMON_GROUND", "WARM", interest,
-                "We both like " + interest + " — what’s your favorite memory connected to it?",
-                "A shared interest makes the question personal without adding pressure.", context, 4);
-        add(result, "COMMON_GROUND", "CURIOUS", interest,
-                "What’s one thing about " + interest + " you wish more people understood?",
-                "Invites an opinion about something you both enjoy.", context, 3);
-        add(result, "COMMON_GROUND", "PLAYFUL", interest,
-                "If we had a free day for " + interest + ", what would the plan be?",
-                "Creates an easy, imaginative shared scenario.", context, 2);
+        addTopicSpecificSuggestions(result, interest, "COMMON_GROUND", true, context, false);
     }
 
     private void addDiscoverySuggestions(List<IceBreakerSuggestion> result, String interest, String context) {
-        add(result, "DISCOVERY", "CURIOUS", interest,
-                "I saw you’re into " + interest + " — what got you started?",
-                "Lets them tell a story about something they already enjoy.", context, 4);
-        add(result, "DISCOVERY", "PLAYFUL", interest,
-                "Quick choice: a relaxed " + interest + " day or an adventurous one?",
-                "An either-or question is easy to answer and easy to follow up.", context, 3);
-        add(result, "DISCOVERY", "THOUGHTFUL", interest,
-                "What do you enjoy most about " + interest + " that people usually miss?",
-                "Moves beyond a surface-level profile question.", context, 2);
+        addTopicSpecificSuggestions(result, interest, "DISCOVERY", false, context, false);
     }
 
     private void addSelfDisclosureSuggestions(List<IceBreakerSuggestion> result, String interest, String context) {
@@ -832,30 +818,109 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
     }
 
     private void addLightTouchSuggestions(List<IceBreakerSuggestion> result, String context) {
+        // Playful Banter & Dating Quirks
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Texting Habits",
+                "Are you the type of person who replies in 0.2 seconds or takes 3 business days? There is no middle ground 😂",
+                "Playful texting habits observation.", context, 4);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Weekend Vibe",
+                "On a scale of 1 to 10, how chaotic is your weekly routine right now?",
+                "Lighthearted, relatable lifestyle question.", context, 3);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Green Flags",
+                "What’s your biggest green flag that people usually don’t notice right away? ✨",
+                "Positive, flattering inquiry.", context, 4);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Elevator Test",
+                "If we were stuck in an elevator for an hour, would we end up in uncontrollable laughter or deep debates?",
+                "Witty situational thought experiment.", context, 4);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Superpowers",
+                "What’s a completely useless superpower that you would secretly love to have?",
+                "Fun and imaginative banter.", context, 3);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Midnight Plans",
+                "Spontaneous midnight drive with great music, or cozy terrace conversations under the stars? 🌌",
+                "Romantic and atmospheric either-or choice.", context, 4);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Teleportation",
+                "If you could teleport anywhere in the world for just 3 hours tonight, where are we heading?",
+                "Adventurous spontaneous fantasy.", context, 4);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Dinner Dilemma",
+                "Cook a homemade dinner together from scratch, or order 4 different comfort takeout dishes?",
+                "Fun food dynamic question.", context, 3);
+
+        // Deep & Sincere Connection
+        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Peaceful Sunday",
+                "What does your ideal peaceful Sunday morning look like from the moment your eyes open?",
+                "Gentle glimpse into their inner world.", context, 4);
+        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Life Lessons",
+                "What’s a life lesson you had to learn the hard way that you’re genuinely grateful for today?",
+                "Deep, authentic sharing opportunity.", context, 4);
+        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Real Laughter",
+                "When was the last time you laughed so hard that your stomach genuinely hurt?",
+                "Evokes a joyful personal memory.", context, 3);
+        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Quiet Pride",
+                "What’s something about yourself that you’re quietly proud of that you rarely get to brag about?",
+                "Honors self-worth and subtle accomplishments.", context, 4);
+        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Comfort",
+                "What does true comfort with another person look like to you? Easy banter or comfortable silence?",
+                "Reveals emotional intimacy preference.", context, 3);
+        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Perspectives",
+                "What’s a belief or perspective you used to hold strongly that completely changed recently?",
+                "Shows intellectual openness and depth.", context, 3);
+        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Small Talk Escape",
+                "What’s one question you wish people asked you more often instead of generic small talk?",
+                "Directly invites them to direct the conversation.", context, 4);
+        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Time Capsule",
+                "If you could send a 10-second voice note to your younger self 5 years ago, what would you say?",
+                "Reflective and tender question.", context, 3);
+
+        // Daily Life, Habits & Curiosity
         add(result, "LIGHT_TOUCH", "WARM", "Today",
                 "What’s been the best part of your day so far?",
-                "Warm, specific, and easy to answer with more than one word.", context, 3);
-        add(result, "LIGHT_TOUCH", "PLAYFUL", "Just for fun",
-                "Would you rather plan a cozy evening or do something spontaneous?",
-                "A simple choice creates an immediate follow-up.", context, 4);
-        add(result, "LIGHT_TOUCH", "CURIOUS", "Favorites",
-                "What’s something you could talk about for hours?",
-                "Discovers a new interest when profile signals are limited.", context, 2);
-        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "This week",
-                "What’s something you’re looking forward to this week?",
-                "Restarts gently without calling attention to a reply gap.", context, 4);
-        add(result, "LIGHT_TOUCH", "PLAYFUL", "Quick choice",
-                "Pick one: sunrise plans, late-night conversations, or a lazy afternoon?",
-                "Three concrete choices lower the effort needed to reply.", context, 3);
-        add(result, "LIGHT_TOUCH", "WARM", "Small wins",
-                "What’s a small thing that made you smile recently?",
-                "Encourages a positive story without becoming too personal.", context, 2);
+                "Warm, specific, and easy to answer.", context, 3);
+        add(result, "LIGHT_TOUCH", "WARM", "Comfort Food",
+                "What’s your ultimate comfort meal after a long, exhausting day?",
+                "Universally relatable comfort food conversation.", context, 3);
+        add(result, "LIGHT_TOUCH", "WARM", "Everyday Joy",
+                "What’s a small everyday luxury that you refuse to compromise on?",
+                "Delightful personal lifestyle preference.", context, 2);
+        add(result, "LIGHT_TOUCH", "WARM", "Quiet Afternoon",
+                "If you had a completely free afternoon with zero notifications, what’s step one?",
+                "Low-pressure relaxation prompt.", context, 3);
+        add(result, "LIGHT_TOUCH", "CURIOUS", "Rabbit Holes",
+                "What’s something you could easily talk about for 2 hours without preparing at all?",
+                "Uncovers their authentic passion.", context, 4);
         add(result, "LIGHT_TOUCH", "CURIOUS", "Recommendations",
-                "What’s one movie, song, or place you’d recommend without hesitation?",
-                "Offers several routes into a more specific topic.", context, 2);
-        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Goals",
-                "What’s something you’d love to get better at this year?",
-                "Invites aspiration while staying open and respectful.", context, 1);
+                "What’s one movie, album, or destination that you recommend with absolute certainty?",
+                "Effortlessly surfaces recommendations.", context, 3);
+        add(result, "LIGHT_TOUCH", "CURIOUS", "Energy Clock",
+                "Are you an early morning sunrise person or a midnight night-owl thinker?",
+                "Explores daily circadian rhythms.", context, 2);
+        add(result, "LIGHT_TOUCH", "CURIOUS", "Quirks",
+                "What’s a quirky habit or ritual you have that most people don’t know about?",
+                "Endearing and vulnerable quirk sharing.", context, 3);
+
+        // Choices & Hypotheses
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Getaways",
+                "Quick choice: spontaneous road trip or planned luxury staycation?",
+                "Simple choice creating an immediate follow-up.", context, 4);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Dream Cabin",
+                "Living in a cozy wooden cottage in the foggy woods, or a high-rise penthouse overlooking a lit-up city?",
+                "Aesthetic living environment debate.", context, 3);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Chore Eradicator",
+                "Never having to do laundry again, or never having to cook dinner again?",
+                "Classic witty domestic dilemma.", context, 3);
+        add(result, "LIGHT_TOUCH", "PLAYFUL", "Atmospheres",
+                "Exploring a vibrant night market with incredible street food, or having a private picnic on a quiet cliff?",
+                "Sensory, imaginative choice.", context, 3);
+        add(result, "LIGHT_TOUCH", "WARM", "Mood Anthem",
+                "What’s a song that immediately puts you in a good mood no matter what kind of day you’re having?",
+                "Sparks music sharing and smiles.", context, 3);
+        add(result, "LIGHT_TOUCH", "WARM", "Upcoming Joy",
+                "What’s something you’re looking forward to this month that’s keeping you excited?",
+                "Future-oriented optimistic topic.", context, 3);
+        add(result, "LIGHT_TOUCH", "THOUGHTFUL", "Admirable Skills",
+                "What’s a skill you’ve always admired in others that you’d love to master yourself?",
+                "Invites healthy aspiration.", context, 2);
+        add(result, "LIGHT_TOUCH", "CURIOUS", "Life Chapters",
+                "If you were writing a book about your life so far, what would the current chapter be titled?",
+                "Creative, self-aware storytelling.", context, 3);
     }
 
     private void addHinglishDirectReplySuggestions(
@@ -927,32 +992,16 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
                 "Main wahi soch raha tha jo tumne " + topic + " ke baare mein bola tha. Koi naya update?",
                 "Purani chat ke thread ko casually revive karta hai.", context, 3);
         addHinglish(result, "CALLBACK", "PLAYFUL", topic,
-                "Chalo, mujhe " + topic + " ki kahani ka agla episode sunao jaldi 😄",
-                "Playful callback se baat me maza aata hai.", context, 1);
+                "Chalo, mujhe " + topic + " wali story ka agla episode sunna hai 😄",
+                "Playful callback familiar thread ko revive karta hai.", context, 1);
     }
 
     private void addHinglishSharedInterestSuggestions(List<IceBreakerSuggestion> result, String interest, String context) {
-        addHinglish(result, "COMMON_GROUND", "WARM", interest,
-                "Hum dono ko " + interest + " pasand hai — isse judi tumhari sabse memorable baat kya hai?",
-                "Shared interest par personal aur warm discussion shuru karta hai.", context, 4);
-        addHinglish(result, "COMMON_GROUND", "CURIOUS", interest,
-                interest + " ke baare mein aisi kaunsi baat hai jo kam logon ko samajh aati hai?",
-                "Dono ki favorite cheez par deep opinion invite karta hai.", context, 3);
-        addHinglish(result, "COMMON_GROUND", "PLAYFUL", interest,
-                "Agar hume " + interest + " ke liye ek poora free din mil jaye, toh plan kya banega?",
-                "Ek fun aur imaginative shared plan banata hai.", context, 2);
+        addTopicSpecificSuggestions(result, interest, "COMMON_GROUND", true, context, true);
     }
 
     private void addHinglishDiscoverySuggestions(List<IceBreakerSuggestion> result, String interest, String context) {
-        addHinglish(result, "DISCOVERY", "CURIOUS", interest,
-                "Maine dekha tumhe " + interest + " ka shauk hai — iski shuruaat kaise hui?",
-                "Unke interest ke peeche ki story jaan ne me madad karta hai.", context, 4);
-        addHinglish(result, "DISCOVERY", "PLAYFUL", interest,
-                "Quick choice: ek relaxed sa " + interest + " day ya kuch super adventurous?",
-                "Aasan either-or sawal jiska jawab dena exciting hai.", context, 3);
-        addHinglish(result, "DISCOVERY", "THOUGHTFUL", interest,
-                interest + " mein tumhe sabse zyada kya pasand hai jo log miss kar dete hain?",
-                "Surface level se aage badhkar thoughtful sawal poochta hai.", context, 2);
+        addTopicSpecificSuggestions(result, interest, "DISCOVERY", false, context, true);
     }
 
     private void addHinglishSelfDisclosureSuggestions(List<IceBreakerSuggestion> result, String interest, String context) {
@@ -965,30 +1014,673 @@ public class InterestBasedIceBreakerService implements IceBreakerService {
     }
 
     private void addHinglishLightTouchSuggestions(List<IceBreakerSuggestion> result, String context) {
+        // Playful Banter & Dating Quirks
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Reply Time",
+                "Aap 2 second mein reply karne wale insaan ho ya 3 business days lagte hain? 😂",
+                "Playful texting habits banter.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Weekend Plans",
+                "Sach sach batao — weekend pe bahar nikalne ka plan banta hai ya 'bed se uthne ka mann nahi' jeet jata hai? 🛌",
+                "Super relatable weekend dilemma.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Rapid Fire",
+                "Agar hum dono ka rapid-fire Q&A ho toh sabse pehle kiska secret bahar aayega? 😉",
+                "Fun and teasing interactive prompt.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Green Flag",
+                "Aapka sabse bada green flag kya hai jo log pehli nazar mein notice nahi karte? ✨",
+                "Complimentary and warm icebreaker.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Movie Life",
+                "Aapki life agar ek movie hoti, toh uska genre rom-com hota ya chaotic comedy? 😄",
+                "Witty cinematic self-description.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Late Night Drive",
+                "Raat ke 12 baje drive pe nikalna with loud music, ya terrace par quiet late-night baatein? 🌙",
+                "Atmospheric late-night choice.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Teleport",
+                "Agar aaj raat 3 ghante ke liye duniya mein kahin bhi teleport ho sakte, toh kahan chalte?",
+                "Adventurous spontaneous fantasy.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Food Experiment",
+                "Ghar par sath mein cooking experiment karna, ya 4 alag alag jagah se favourite food order karna? 🍕",
+                "Relatable and delicious scenario.", context, 3);
+
+        // Deep & Sincere Connection
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Perfect Sunday",
+                "Aapke liye perfect Sunday ka matlab kya hai — silence, achhi coffee aur book, ya dosto ke sath chill karna?",
+                "Gentle exploration of peaceful routines.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Real Laughter",
+                "Aakhri baar itna kab hasse the ki pet mein dard hone laga aur aankhon se aansu nikal aaye? 😂",
+                "Evokes a wholesome laughing memory.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Quiet Pride",
+                "Apne baare mein aisi kaunsi baat hai jis par tumhe secretly garv hai par zyada log nahi jaante?",
+                "Thoughtful self-worth recognition.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Peace & Calm",
+                "Aapko sabse zyada sukoon kis cheez se milta hai jab poora din stressful raha ho?",
+                "Comforting emotional safe space.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Comfort Zone",
+                "Kisi ke sath comfortable hona kya hota hai — bina ruke baatein karna ya chup chaap sath baithna?",
+                "Explores emotional connection styles.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Maturity",
+                "Aisi kaunsi baat hai jo pehle tumhare liye bohot matter karti thi par ab bilkul nahi karti?",
+                "Growth and perspective shift.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Real Talk",
+                "Formal small talk chhodkar, aisi kaunsi baat hai jisme sach mein ghanto kho sakte ho?",
+                "Invites deep, uninhibited conversation.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Younger Self",
+                "Agar 5 saal pehle wale khud se 10 second baat karne ka mauka mile, toh kya advice doge?",
+                "Meaningful nostalgic reflection.", context, 3);
+
+        // Daily Life, Habits & Curiosity
         addHinglish(result, "LIGHT_TOUCH", "WARM", "Aaj ka din",
                 "Aaj ke din ka sabse best part kya raha?",
-                "Warm aur natural sawal jiska jawab dena bohot aasan hai.", context, 3);
-        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Chai / Coffee",
-                "Chai ya coffee? Aur shaam ka kya scene hai?",
-                "Lighthearted aur relatable icebreaker.", context, 4);
-        addHinglish(result, "LIGHT_TOUCH", "CURIOUS", "Favorite baatein",
-                "Aisi kaunsi cheez hai jiske baare mein tum bina thake ghanto baat kar sakte ho?",
-                "Unki real passion jaan ne ka accha tarika.", context, 2);
-        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Upcoming plans",
-                "Aane wale dinon mein aisi kaunsi cheez hai jiska sabse zyada intezaar hai?",
-                "Future-focused aur positive mood maintain karta hai.", context, 4);
-        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Vibe choice",
-                "Pick one: subah ki chai, der raat tak baatein, ya lazy weekend afternoon?",
-                "Teen choices se jawab dena effortless ho jata hai.", context, 3);
-        addHinglish(result, "LIGHT_TOUCH", "WARM", "Small wins",
-                "Koi aisi chhoti si cheez jisne aaj tumhare chehre par smile la di?",
-                "Positive story encourage karta hai bina over-personal hue.", context, 2);
-        addHinglish(result, "LIGHT_TOUCH", "CURIOUS", "Recommendations",
-                "Koi aisi movie, gaana ya jagah jo tum bina soche recommend karoge?",
-                "Recommendations se specific topics par baat nikal aati hai.", context, 2);
-        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Goals",
-                "Is saal aisi kaunsi naye cheez seekhne ka plan hai?",
-                "Respectful aur inspiring discussion start karta hai.", context, 1);
+                "Warm, specific, and easy to answer.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "WARM", "Comfort Food",
+                "Thaka dene wale din ke baad aapka ultimate comfort food kya hota hai?",
+                "Universal comfort food bond.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "WARM", "Non-Negotiable",
+                "Aisi kaunsi aadat ya cheez hai jisme aap compromise bilkul pasand nahi karte?",
+                "Personal lifestyle preference.", context, 2);
+        addHinglish(result, "LIGHT_TOUCH", "WARM", "No Phone Afternoon",
+                "Agar poori dopahar bina kisi phone call ya notification ke mil jaye, toh sabse pehle kya karoge?",
+                "Relaxing weekend vision.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "CURIOUS", "Hours Of Talking",
+                "Aisi kaunsi topic ya cheez hai jiske baare mein tum bina ruke ghanto baatein kar sakte ho?",
+                "Reveals true inner passions.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "CURIOUS", "Top Recommendations",
+                "Koi aisi movie, gaana ya cafe jo tum bina soche kisi ko bhi recommend kar sakte ho?",
+                "Natural and organic recommendation opener.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "CURIOUS", "Energy Clock",
+                "Subah ki shanti pasand hai ya der raat ka sukoon? Kis time energy peak par hoti hai?",
+                "Explores day vs night personality.", context, 2);
+        addHinglish(result, "LIGHT_TOUCH", "CURIOUS", "Quirky Habits",
+                "Aapki koi aisi funny ya quirky aadat jo sirf aapke close friends jaante hain?",
+                "Endearing and fun quirk share.", context, 3);
+
+        // Choices & Hypotheses
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Trip Choice",
+                "Quick choice: spontaneous dhabe wali road trip ya planned luxury resort staycation?",
+                "Classic travel style debate.", context, 4);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Dream Stay",
+                "Pahadon mein ek cozy wooden cottage, ya bustling city mein high-rise penthouse view?",
+                "Atmospheric living fantasy.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Life Hack",
+                "Life mein cooking na karni pade ya safai/laundry na karni pade — kis superpower ko chunoge? 😂",
+                "Hilarious practical dilemma.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "PLAYFUL", "Night Market",
+                "Night street food market explore karna, ya shaam ko sunset ke waqt quiet terrace par baithna?",
+                "Vibrant vs peaceful atmosphere choice.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "WARM", "Mood Booster Song",
+                "Aisa kaunsa gaana hai jo bajte hi aapka mood 100% instant positive ho jata hai?",
+                "Music sharing and feel-good energy.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "WARM", "Upcoming Plans",
+                "Is mahine aisi kaunsi cheez aane wali hai jiska aapko sabse zyada intezaar hai?",
+                "Future-oriented positive anticipation.", context, 3);
+        addHinglish(result, "LIGHT_TOUCH", "THOUGHTFUL", "Admirable Trait",
+                "Dusron mein aisi kaunsi quality dekhkar lagta hai ki 'kaash yeh mujhme bhi hoti'?",
+                "Vulnerable and inspiring observation.", context, 2);
+        addHinglish(result, "LIGHT_TOUCH", "CURIOUS", "Book Title",
+                "Agar aapki life par ek book likhi jaye, toh is current chapter ka title kya hoga?",
+                "Witty, reflective storytelling prompt.", context, 3);
+    }
+
+    /**
+     * Generates rich, category-specific icebreaker suggestions for a given interest topic.
+     * Supports 12 distinct categories (Coffee, Music, Travel, Movies, Food, Gym, Books,
+     * Gaming, Pets, Photography/Art, Outdoors, Tech) with personalized prompts in both
+     * English and Hinglish across four tones: WARM, PLAYFUL, CURIOUS, THOUGHTFUL.
+     */
+    private void addTopicSpecificSuggestions(
+            List<IceBreakerSuggestion> result,
+            String rawInterest,
+            String circle,
+            boolean isShared,
+            String context,
+            boolean hinglish) {
+        String interest = rawInterest != null ? rawInterest.trim().toLowerCase(Locale.ROOT) : "";
+        String display  = displayTopic(rawInterest);
+
+        // ── Coffee / Chai ────────────────────────────────────────────────
+        if (interest.matches(".*\\b(coffee|cafe|chai|tea|latte|espresso|cappuccino|matcha)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "WARM", display,
+                            "Hum dono ko " + display + " pasand hai — filter coffee gang ya desi cutting chai team? ☕",
+                            "Shared chai/coffee passion pe playful icebreaker.", context, 5);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Perfect cup of " + display + " ke liye sabse important kya hai tumhare liye — beans, barista ya mood?",
+                            "Deep dive into their coffee personality.", context, 4);
+                    addHinglish(result, circle, "THOUGHTFUL", display,
+                            "Mujhe batao — " + display + " peete waqt kaisa feel hota hai, rush mein lete ho ya sab slow down ho jaata hai?",
+                            "Introspective coffee ritual question.", context, 3);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " itna pasand hai! Black peete ho ya kuch milake? Favourite cafe batao 😊",
+                            "Discovery icebreaker around coffee preference.", context, 4);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "" + display + " lover ho — toh morning bina " + display + " ke mood kaisa hota hai? 😂",
+                            "Relatable coffee dependency humour.", context, 3);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "WARM", display,
+                            "Both coffee people — are you a specialty pour-over fan or a classic strong filter?",
+                            "Shared coffee passion icebreaker.", context, 5);
+                    add(result, circle, "CURIOUS", display,
+                            "What makes the perfect cup of " + display + " for you — the beans, the place, or the company?",
+                            "Personal coffee ritual deep dive.", context, 4);
+                    add(result, circle, "PLAYFUL", display,
+                            "Okay coffee quiz: oat milk, almond milk, or plain milk? There's no wrong answer, only red flags 😄",
+                            "Playful choice-based coffee banter.", context, 3);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You're into " + display + " — black and bold or fancy and frothy? What's your usual order?",
+                            "Discovery opener around coffee style.", context, 4);
+                    add(result, circle, "WARM", display,
+                            "Where's your go-to " + display + " spot? I'm always looking for hidden gems 🗺️",
+                            "Café recommendation discovery.", context, 3);
+                }
+            }
+
+        // ── Music ────────────────────────────────────────────────────────
+        } else if (interest.matches(".*\\b(music|song|songs|playlist|concert|band|artist|vinyl|spotify|guitar|piano|drums|singing|rap|jazz|indie|pop|rock|edm|classical|hiphop|hip hop)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Hum dono " + display + " lovers hain — toh abhi playlist shuffle karein toh konsa track hai jo tum skip kabhi nahi karte? 🎵",
+                            "Shared music passion with skip-proof track question.", context, 5);
+                    addHinglish(result, circle, "WARM", display,
+                            "Aisa kaunsa gaana hai jise sunke tumhare andar kuch shift ho jaata hai — vibe ya memories?",
+                            "Emotional connection to music.", context, 4);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Concert mein gaye ho ya mostly headphones wale insaan ho? Favourite live experience batao!",
+                            "Live music vs solo listening discovery.", context, 4);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " pasand hai — ek aisa gaana batao jo tumhare baare mein sab kuch describe kare!",
+                            "Music self-description icebreaker.", context, 5);
+                    addHinglish(result, circle, "WARM", display,
+                            "Mood ke hisaab se alag alag " + display + " sunna pasand hai ya ek specific playlist pe jilte ho?",
+                            "Mood-music preference question.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "PLAYFUL", display,
+                            "We're both music lovers! What's a song you'd never skip no matter where you are? 🎶",
+                            "Shared music passion — skip-proof track icebreaker.", context, 5);
+                    add(result, circle, "WARM", display,
+                            "Is there an album that completely changed how you hear music for the first time?",
+                            "Meaningful album discovery.", context, 4);
+                    add(result, circle, "CURIOUS", display,
+                            "Concert person or headphone introvert? What's a live show that completely blew your mind?",
+                            "Live vs solo music experience.", context, 4);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You're into " + display + "! What's a song that basically tells your whole life story?",
+                            "Music as self-description icebreaker.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "If your life had a soundtrack right now, what would the opening track be? 🎧",
+                            "Creative cinematic music question.", context, 4);
+                }
+            }
+
+        // ── Travel ───────────────────────────────────────────────────────
+        } else if (interest.matches(".*\\b(travel|travelling|traveling|backpacking|trip|trips|explore|exploring|wanderlust|adventure|adventures|hiking|trekking|road trip|passport|vacation|holiday)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Dono travel lovers hain! Toh batao — mountains ya beaches? Aur ek dream destination jo abhi bhi wish list pe hai? ✈️",
+                            "Classic travel debate plus dream destination.", context, 5);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Sabse unexpected jagah kaunsi thi jahan gaye ho aur sach mein WOW feel hua?",
+                            "Surprising travel memory icebreaker.", context, 4);
+                    addHinglish(result, circle, "WARM", display,
+                            "Aisi koi trip jisme sab galat gaya par baad mein sabse acchi yaad ban gayi? 😄",
+                            "Funny travel mishap story prompt.", context, 4);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " ka shauk hai — abhi tak ki sabse favourite trip kaunsi thi aur kyun?",
+                            "Personal travel highlight discovery.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Solo trip ya gang ke sath? Aur over-planned itinerary ya complete spontaneous?",
+                            "Travel style personality question.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "PLAYFUL", display,
+                            "Both love " + display + "! Mountains or beaches — and what's still top of the bucket list? ✈️",
+                            "Classic travel debate plus bucket list.", context, 5);
+                    add(result, circle, "CURIOUS", display,
+                            "What's the most underrated " + display + " destination you've been to that genuinely surprised you?",
+                            "Hidden gem travel discovery.", context, 4);
+                    add(result, circle, "WARM", display,
+                            "What " + display + " trip went hilariously wrong but became your best story ever?",
+                            "Funny travel mishap story.", context, 4);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You love " + display + "! What's been your absolute favourite trip and why?",
+                            "Personal travel highlight opener.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "Solo " + display + " explorer or always with a squad? Hyper-planned or wing-it spontaneous?",
+                            "Travel personality style question.", context, 4);
+                }
+            }
+
+        // ── Movies / Shows / Cinema ──────────────────────────────────────
+        } else if (interest.matches(".*\\b(movies|movie|films|film|cinema|web series|series|netflix|ott|bollywood|hollywood|anime|kdrama|tv shows|shows|streaming|webseries)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Dono cinephiles hain! Ek movie batao jo aapni true personality describe kare — aur lie mat karna 😄",
+                            "Movie as self-expression icebreaker.", context, 5);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Sabse zyada underrated " + display + " kaunsa hai jise tum sab ko recommend karte ho bina soche?",
+                            "Underrated gem recommendation.", context, 4);
+                    addHinglish(result, circle, "WARM", display,
+                            "Aisi kaunsi " + display + " hai jo aapne ek se zyada baar dekhi aur har baar naya kuch dikh gaya?",
+                            "Deep rewatch emotional connection.", context, 4);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " ka shauk hai — abhi kaunsa show/movie chal raha hai? Spoilers mat dena 😂",
+                            "No-spoiler current watch question.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Ek aisi " + display + " batao jisme sab kehte hain 'yeh toh sab dekhte hain' par tumne ab tak nahi dekhi 😂",
+                            "Guilty secret unwatched movie prompt.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "PLAYFUL", display,
+                            "Both movie lovers! What's one film that just describes your personality perfectly — no lying 😄",
+                            "Movie as personality mirror icebreaker.", context, 5);
+                    add(result, circle, "CURIOUS", display,
+                            "What's your most underrated " + display + " recommendation that people always thank you for?",
+                            "Hidden gem recommendation.", context, 4);
+                    add(result, circle, "THOUGHTFUL", display,
+                            "Is there a movie or scene that you rewatched and noticed something completely new?",
+                            "Deep rewatch reflection.", context, 3);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You're into " + display + "! What are you currently watching and is it worth bingeing? No spoilers 🙏",
+                            "Current watch discovery question.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "Confession time — what's a hugely popular " + display + " you've still not watched and get judged for? 😂",
+                            "Guilty secret unwatched content prompt.", context, 4);
+                }
+            }
+
+        // ── Food / Cooking / Street Food ─────────────────────────────────
+        } else if (interest.matches(".*\\b(food|cooking|cook|foodie|foodies|baking|bake|cuisine|recipe|recipes|street food|restaurant|restaurants|biryani|pizza|sushi|cafe|eating|eat)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "WARM", display,
+                            "Dono foodies hain! Aisi kaunsi dish hai jo tum khud ghar par banaate ho aur sach mein proud feel hote ho? 🍳",
+                            "Shared foodie passion — signature dish icebreaker.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Ek honest food confession: junk food guilty pleasure kya hai jo tum kabhi publicly admit nahi karte? 😂",
+                            "Relatable guilty food pleasure.", context, 4);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Abhi tak khaya hua sabse amazing meal kaunsa tha — ghar ka, restaurant ka ya kisi trip ka?",
+                            "Ultimate meal memory prompt.", context, 4);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " ka craze hai — signature dish kya hai jise sab se zyada compliments milte hain?",
+                            "Foodie signature dish discovery.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Ghar ka fresh khana ya bahar ka mast street food — aur kisi ek ka naam lete hi heart happy ho jaata hai?",
+                            "Homemade vs street food personality.", context, 3);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "WARM", display,
+                            "Both foodies! What's one dish you cook at home that you're secretly really proud of? 🍳",
+                            "Shared cooking passion — signature dish icebreaker.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "Honest food confession: what's a guilty pleasure you'd never admit in public? 😂",
+                            "Relatable guilty food pleasure.", context, 4);
+                    add(result, circle, "CURIOUS", display,
+                            "What's the most memorable meal you've ever had — home cooked, fine dining, or a street stall?",
+                            "Memorable meal story prompt.", context, 4);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You're a " + display + " person! What's your signature dish that always impresses people?",
+                            "Foodie signature dish discovery.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "Okay food debate: home-cooked comfort vs. best street food ever found. Which wins?",
+                            "Home vs street food personality question.", context, 3);
+                }
+            }
+
+        // ── Gym / Fitness / Sports ───────────────────────────────────────
+        } else if (interest.matches(".*\\b(gym|fitness|workout|workouts|exercise|yoga|running|cycling|sports|cricket|football|basketball|badminton|swimming|crossfit|pilates|bodybuilding|training)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Dono " + display + " lovers hain! Gym mein headphones laga ke zone-in karte ho ya baat karna pasand hai workout ke beech? 😄",
+                            "Gym personality — headphones vs social.", context, 5);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Aisi kaunsi " + display + " activity hai jisme genuinely addicted ho gaye ho?",
+                            "Fitness addiction discovery.", context, 4);
+                    addHinglish(result, circle, "WARM", display,
+                            "Rest day pe kya hota hai — proper recovery ya guilt trip? 😂",
+                            "Relatable rest day feelings.", context, 3);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " ka passion hai — journey kab start hui aur kya spark kiya?",
+                            "Fitness journey origin story.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Morning workout wale ho ya night owl gym person? Aur pre-workout se judge karte ho kya? 😂",
+                            "Workout timing and habits banter.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "PLAYFUL", display,
+                            "Both gym people! Do you go full headphones-in focused mode or love chatting between sets? 😄",
+                            "Gym personality discovery.", context, 5);
+                    add(result, circle, "CURIOUS", display,
+                            "What's one fitness activity you've genuinely become addicted to?",
+                            "Fitness addiction discovery.", context, 4);
+                    add(result, circle, "WARM", display,
+                            "Rest days — proper recovery mode or constant guilt? The eternal fitness struggle 😂",
+                            "Relatable rest day question.", context, 3);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You're into " + display + "! How did that journey start and what was the turning point?",
+                            "Fitness origin story icebreaker.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "Morning warrior or late-night gym session? And do you judge people who skip leg day? 😂",
+                            "Workout timing and habits banter.", context, 4);
+                }
+            }
+
+        // ── Books / Reading ──────────────────────────────────────────────
+        } else if (interest.matches(".*\\b(books|book|reading|read|novel|novels|fiction|non-fiction|literature|author|poetry|kindle|library|bookstore|bookworm)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "WARM", display,
+                            "Dono book lovers! Aisi kaunsi " + display + " hai jisne seriously sochne par majboor kar diya?",
+                            "Shared reading passion — life-changing book.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Honest confession: kitni books 'To Read' list mein hain jo aaj bhi untouched hain? 😅",
+                            "Relatable TBR pile guilt.", context, 4);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Bestseller list follow karte ho ya hidden gems khudhi dhundhte ho? Last underrated find kya tha?",
+                            "Reading discovery style question.", context, 4);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " ka passion hai — abhi kya padh rahe ho aur itna time kahan se milta hai? 😄",
+                            "Current read with relatable time question.", context, 5);
+                    addHinglish(result, circle, "WARM", display,
+                            "Ek aisi " + display + " batao jo dil se recommend karoge bina kisi reason ke?",
+                            "Heartfelt book recommendation.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "WARM", display,
+                            "Fellow book lover! What's one book that genuinely shifted your perspective?",
+                            "Shared reading passion — mindset-shifting book.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "Confession: how tall is your unread 'To Be Read' pile right now? 😅",
+                            "Relatable TBR pile guilt.", context, 4);
+                    add(result, circle, "CURIOUS", display,
+                            "Bestseller follower or underrated gems hunter? What's your last hidden find?",
+                            "Reading discovery style question.", context, 4);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You read! What are you in the middle of right now and is it living up to the hype?",
+                            "Current read discovery question.", context, 5);
+                    add(result, circle, "WARM", display,
+                            "What's one book you'd hand to someone with zero explanation and just say 'trust me'?",
+                            "Heartfelt unconditional book recommendation.", context, 4);
+                }
+            }
+
+        // ── Gaming ───────────────────────────────────────────────────────
+        } else if (interest.matches(".*\\b(gaming|games|game|gamer|playstation|xbox|pc gaming|mobile gaming|pubg|bgmi|valorant|minecraft|fifa|rpg|fps|esports|twitch|stream)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Dono gamers hain! Casual khiladi ya serious rank grind type? Aur sabse zyada tilt karne wali cheez kya hai? 🎮",
+                            "Shared gaming passion — casual vs competitive.", context, 5);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Favourite genre kya hai — action, RPG, strategy ya puzzle? Aur har game mein same style follow karte ho?",
+                            "Gaming genre and play-style question.", context, 4);
+                    addHinglish(result, circle, "WARM", display,
+                            "Aisi kaunsi " + display + " hai jisne tum pe genuinely emotional impact kiya — sad ending ya epic moment?",
+                            "Emotionally impactful gaming moment.", context, 3);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " ka craze hai — currently kya khel rahe ho? Worth it hai?",
+                            "Current game play discovery.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "PC/console ya mobile gamer? Aur seriously puchha toh — kya tum rage-quit karte ho? 😂",
+                            "Platform and rage-quit banter.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "PLAYFUL", display,
+                            "Both gamers! Are you the casual Sunday session type or hardcore rank-grinder? 🎮",
+                            "Shared gaming — casual vs competitive.", context, 5);
+                    add(result, circle, "CURIOUS", display,
+                            "What's your favourite gaming genre and do you actually stick to it or jump around?",
+                            "Genre and play-style discovery.", context, 4);
+                    add(result, circle, "WARM", display,
+                            "What game genuinely hit you emotionally — a plot twist, ending, or moment that you didn't expect?",
+                            "Emotionally impactful gaming moment.", context, 3);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You're a gamer! What are you playing right now and is it actually worth the hype?",
+                            "Current game discovery question.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "PC, console, or mobile? And let's be real — how often do you rage-quit? 😂",
+                            "Platform and rage-quit honesty.", context, 4);
+                }
+            }
+
+        // ── Pets / Animals ───────────────────────────────────────────────
+        } else if (interest.matches(".*\\b(pets|pet|dog|dogs|cat|cats|puppy|puppies|kitten|kittens|animals|birds|hamster|aquarium|fish|rabbit)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "WARM", display,
+                            "Dono " + display + " lovers hain! Tumhara " + display + " hai ghar mein? Ek cute story sunao 🐾",
+                            "Shared pet love — cute story prompt.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Honest bato — insan se pehle " + display + " se pyaar ho sakta hai? 😂",
+                            "Relatable pet obsession humour.", context, 4);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "" + display + " ki sabse funny ya mischievous harkat kya thi jab genuinely gusse mein nahi has saka? 😄",
+                            "Pet mischief story prompt.", context, 4);
+                } else {
+                    addHinglish(result, circle, "WARM", display,
+                            "Tumhe " + display + " bahot pasand hai — ghar mein koi " + display + " hai? Unka naam aur photo bhi bhejo! 🐾",
+                            "Pet owner discovery with photo request.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Dog person, cat person, ya inka jhagda settle nahi hua abhi bhi? 😄",
+                            "Classic dog vs cat debate.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "WARM", display,
+                            "Both " + display + " lovers! Do you have one at home? I need the full cute story 🐾",
+                            "Shared pet love — cute story prompt.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "Real talk: is it even possible to fall for someone who's not a " + display + " person? 😂",
+                            "Relatable pet obsession question.", context, 4);
+                    add(result, circle, "CURIOUS", display,
+                            "What's the funniest thing your " + display + " has done where you couldn't even be mad?",
+                            "Pet mischief story prompt.", context, 4);
+                } else {
+                    add(result, circle, "WARM", display,
+                            "You love " + display + "! Do you have one at home or is it a someday dream?",
+                            "Pet owner discovery question.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "Dog person, cat person, or are you still on the fence and keeping us in suspense? 😄",
+                            "Classic dog vs cat debate.", context, 4);
+                }
+            }
+
+        // ── Photography / Art ─────────────────────────────────────────────
+        } else if (interest.matches(".*\\b(photography|photo|photos|camera|art|drawing|painting|sketch|sketching|design|illustration|creative|artist|portrait|landscape)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Dono creative souls! Tumhari photography/art mein konsa moment ya subject sabse zyada dil ko touch karta hai? 📷",
+                            "Shared creative passion — subject preference.", context, 5);
+                    addHinglish(result, circle, "WARM", display,
+                            "Aisi kaunsi ek creation hai jis par genuine pride feel hota hai — share karoge?",
+                            "Personal creative pride piece.", context, 4);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Filter heavy edits ya completely raw/authentic look? Creative philosophy kya hai tumhari? 😄",
+                            "Editing philosophy playful debate.", context, 3);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " ka passion hai — kab se shuru kiya aur pehla moment kaunsa tha jab genuinely accha feel hua?",
+                            "Creative journey origin story.", context, 5);
+                    addHinglish(result, circle, "WARM", display,
+                            "Apna favourite captured moment ya drawing share karte ho? Dekhna chahta/chahti hoon 😊",
+                            "Creative work sharing invitation.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "CURIOUS", display,
+                            "Both creative people! What subject or moment do you find yourself drawn to most? 📷",
+                            "Shared creative passion — subject focus.", context, 5);
+                    add(result, circle, "WARM", display,
+                            "What's one piece of your work that you're genuinely proud of? I'd love to see it!",
+                            "Personal creative pride piece.", context, 4);
+                    add(result, circle, "PLAYFUL", display,
+                            "Heavy filters or raw authenticity? What's your creative philosophy? 😄",
+                            "Editing style debate.", context, 3);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You're into " + display + "! How did you start and when did it click that you were genuinely good?",
+                            "Creative journey and skill discovery.", context, 5);
+                    add(result, circle, "WARM", display,
+                            "Would you share something you've made? I'm genuinely curious about your style 😊",
+                            "Creative work sharing invitation.", context, 4);
+                }
+            }
+
+        // ── Outdoors / Nature / Trekking ─────────────────────────────────
+        } else if (interest.matches(".*\\b(outdoors|nature|trekking|trek|camping|hiking|mountains|sunset|sunsets|sunrise|beach|forests|national park|wildlife|birding)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "WARM", display,
+                            "Dono " + display + " lovers! Abhi tak ki sabse epic trek ya sunset ka experience kya tha? 🏔️",
+                            "Shared outdoors passion — epic memory prompt.", context, 5);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Mountains, forests ya beaches — kaunsi jagah actually sab bhula deti hai completely?",
+                            "Nature preference personality question.", context, 4);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Alag kit ke saath fully prepared wale ho ya 'chalo dekhte hain' wale adventure type? 😄",
+                            "Prepared vs spontaneous outdoors style.", context, 3);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " pasand hai — abhi tak ki favourite jagah kaunsi thi jahan jaake peace mili?",
+                            "Favourite peaceful outdoors spot discovery.", context, 5);
+                    addHinglish(result, circle, "WARM", display,
+                            "Koi aisi " + display + " destination hai jo wish list mein hai aur bus ek mauka chahiye?",
+                            "Dream outdoors destination.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "WARM", display,
+                            "Outdoors people both! What's been your most stunning trek or sunset experience so far? 🏔️",
+                            "Shared outdoors passion — epic memory.", context, 5);
+                    add(result, circle, "CURIOUS", display,
+                            "Mountains, forests, or beaches — which one actually makes you forget everything?",
+                            "Nature personality preference.", context, 4);
+                    add(result, circle, "PLAYFUL", display,
+                            "Fully kitted adventure gear person or spontaneous 'we'll figure it out' energy? 😄",
+                            "Outdoors planning style question.", context, 3);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You love " + display + "! What's a place that genuinely gave you peace like nowhere else?",
+                            "Peaceful outdoors spot discovery.", context, 5);
+                    add(result, circle, "WARM", display,
+                            "What's still on your outdoors bucket list that you're planning to hit?",
+                            "Dream outdoors destination.", context, 4);
+                }
+            }
+
+        // ── Tech / Coding / Science ──────────────────────────────────────
+        } else if (interest.matches(".*\\b(tech|technology|coding|programming|software|code|developer|ai|machine learning|data science|startup|gadgets|science|engineering|robotics|iot)\\b.*")) {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Dono " + display + " wale hain! Kaunsi emerging technology abhi genuinely excite kar rahi hai? 💻",
+                            "Shared tech passion — exciting tech trend.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Sabse bizarre ya unexpected " + display + " use case kaunsa tha jo dekh ke genuinely amazed ho gaye? 🤯",
+                            "Wild tech use-case discovery.", context, 4);
+                    addHinglish(result, circle, "WARM", display,
+                            "Tech mein kab aaya — passion se ya galti se? Koi interesting backstory hai? 😄",
+                            "Tech journey origin story.", context, 4);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhara " + display + " mein interest hai — kaunsa project ya area abhi sab se interesting lag raha hai?",
+                            "Current tech interest focus discovery.", context, 5);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "Dark mode ya light mode? Yeh toh character test hai 😂",
+                            "Classic dev debate icebreaker.", context, 4);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "CURIOUS", display,
+                            "Both " + display + " people! What's one emerging area that has you genuinely excited right now? 💻",
+                            "Shared tech passion — exciting trend.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "What's the most unexpected or bizarre tech use case you've seen that blew your mind? 🤯",
+                            "Wild tech use-case icebreaker.", context, 4);
+                    add(result, circle, "WARM", display,
+                            "How did you get into " + display + " — pure passion or a happy accident?",
+                            "Tech journey origin story.", context, 4);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You're into " + display + "! What project or area is keeping you most engaged right now?",
+                            "Current tech focus discovery.", context, 5);
+                    add(result, circle, "PLAYFUL", display,
+                            "Okay important question: dark mode or light mode? This tells me everything I need to know 😂",
+                            "Classic dev personality debate.", context, 4);
+                }
+            }
+
+        // ── Generic fallback ─────────────────────────────────────────────
+        } else {
+            if (hinglish) {
+                if (isShared) {
+                    addHinglish(result, circle, "WARM", display,
+                            "Hum dono ko " + display + " pasand hai — tumhara sabse favourite experience kaunsa raha isme? ✨",
+                            "Shared passion ko favourite experience ke through deepen karta hai.", context, 4);
+                    addHinglish(result, circle, "PLAYFUL", display,
+                            "" + display + " mein hum dono match karte hain — lagta hai ek aur cheez toh common hai 😉",
+                            "Playful chemistry with shared interest.", context, 3);
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "" + display + " ka sabse interesting aspect kaunsa hai jo aksar log miss kar jaate hain?",
+                            "Deeper discovery of shared interest.", context, 3);
+                } else {
+                    addHinglish(result, circle, "CURIOUS", display,
+                            "Tumhe " + display + " ka interest hai — iski shuruat kaise hui aur kya mast laga pehli baar? 😊",
+                            "Discovery icebreaker for any interest.", context, 4);
+                    addHinglish(result, circle, "WARM", display,
+                            "" + display + " ke baare mein mujhe bhi samajhna hai — koi tips ya starting point bata sakte ho?",
+                            "Warm curiosity-driven discovery.", context, 3);
+                }
+            } else {
+                if (isShared) {
+                    add(result, circle, "WARM", display,
+                            "Since we both love " + display + ", what's your absolute favourite experience with it so far? ✨",
+                            "Deepens connection around a shared passion.", context, 4);
+                    add(result, circle, "PLAYFUL", display,
+                            "We both love " + display + " — I think that already puts us ahead of most people 😉",
+                            "Playful shared interest chemistry.", context, 3);
+                    add(result, circle, "CURIOUS", display,
+                            "What's the most underrated thing about " + display + " that most people overlook?",
+                            "Deeper shared interest discovery.", context, 3);
+                } else {
+                    add(result, circle, "CURIOUS", display,
+                            "You're into " + display + " — how did you first get into it and what hooked you?",
+                            "Discovery icebreaker for any interest.", context, 4);
+                    add(result, circle, "WARM", display,
+                            "I'd love to learn more about " + display + " from your perspective — any great starting points?",
+                            "Warm curiosity-driven interest discovery.", context, 3);
+                }
+            }
+        }
     }
 
     private void addHinglish(
