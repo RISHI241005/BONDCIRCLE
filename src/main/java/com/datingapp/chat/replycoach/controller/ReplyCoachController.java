@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping({"/api/ai/reply-suggestions", "/api/v1/ai/reply-suggestions"})
+@RequestMapping({"/api/ai/reply-suggestions", "/api/v1/ai/reply-suggestions", "/api/v1/api/ai/reply-suggestions"})
 @Tag(name = "AI Reply Coach", description = "Context-aware conversational suggestions and reply coaching")
 @SecurityRequirement(name = "Bearer Authentication")
 public class ReplyCoachController {

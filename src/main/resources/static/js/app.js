@@ -96,9 +96,15 @@ async function api(path, options = {}) {
     if (options.body !== undefined) headers["Content-Type"] = "application/json";
     if (state.token) headers.Authorization = `Bearer ${state.token}`;
 
+    const normalizedPath = path.startsWith(API_PREFIX)
+        ? path
+        : path.startsWith("/api/")
+            ? `${API_PREFIX}${path.slice(4)}`
+            : `${API_PREFIX}${path}`;
+
     let response;
     try {
-        response = await fetch(`${API_PREFIX}${path}`, { ...options, headers });
+        response = await fetch(normalizedPath, { ...options, headers });
     } catch {
         throw new Error("The server is unreachable. Check your connection and try again.");
     }
@@ -475,7 +481,7 @@ async function fetchReplySuggestions() {
     renderReplyCoachLoading("Listening to conversation and drafting replies…");
 
     try {
-        const res = await api("/api/ai/reply-suggestions", {
+        const res = await api("/ai/reply-suggestions", {
             method: "POST",
             body: {
                 conversationId: conversationId,
@@ -510,7 +516,7 @@ async function regenerateReplySuggestions() {
     renderReplyCoachLoading("Exploring different angles…");
 
     try {
-        const res = await api("/api/ai/reply-suggestions/regenerate", {
+        const res = await api("/ai/reply-suggestions/regenerate", {
             method: "POST",
             body: {
                 conversationId: conversationId,
@@ -640,7 +646,7 @@ function handleDismissSuggestion(sug, cardEl) {
 async function recordReplyFeedback(suggestionId, conversationId, action, suggestionText) {
     if (!suggestionId || !conversationId) return;
     try {
-        await api("/api/ai/reply-suggestions/feedback", {
+        await api("/ai/reply-suggestions/feedback", {
             method: "POST",
             body: {
                 suggestionId: String(suggestionId),
