@@ -93,7 +93,13 @@ function getErrorMessage(payload, fallback) {
 
 async function api(path, options = {}) {
     const headers = { Accept: "application/json", ...(options.headers || {}) };
-    if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    let body = options.body;
+    if (body !== undefined) {
+        if (typeof body === "object" && !(body instanceof FormData) && !(body instanceof Blob)) {
+            body = JSON.stringify(body);
+        }
+        if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
+    }
     if (state.token) headers.Authorization = `Bearer ${state.token}`;
 
     const normalizedPath = path.startsWith(API_PREFIX)
@@ -104,7 +110,7 @@ async function api(path, options = {}) {
 
     let response;
     try {
-        response = await fetch(normalizedPath, { ...options, headers });
+        response = await fetch(normalizedPath, { ...options, headers, body });
     } catch {
         throw new Error("The server is unreachable. Check your connection and try again.");
     }
@@ -483,10 +489,10 @@ async function fetchReplySuggestions() {
     try {
         const res = await api("/ai/reply-suggestions", {
             method: "POST",
-            body: {
+            body: JSON.stringify({
                 conversationId: conversationId,
                 limit: 3
-            }
+            })
         });
         if (state.activeId !== conversationId) return;
         const payload = res?.data || res;
@@ -518,12 +524,12 @@ async function regenerateReplySuggestions() {
     try {
         const res = await api("/ai/reply-suggestions/regenerate", {
             method: "POST",
-            body: {
+            body: JSON.stringify({
                 conversationId: conversationId,
                 rejectedSuggestionIds: state.replyCoach.rejectedIds,
                 rejectedTexts: state.replyCoach.rejectedTexts,
                 limit: 3
-            }
+            })
         });
         if (state.activeId !== conversationId) return;
         const payload = res?.data || res;
@@ -648,12 +654,12 @@ async function recordReplyFeedback(suggestionId, conversationId, action, suggest
     try {
         await api("/ai/reply-suggestions/feedback", {
             method: "POST",
-            body: {
+            body: JSON.stringify({
                 suggestionId: String(suggestionId),
                 conversationId: String(conversationId),
                 action: action,
                 suggestionText: suggestionText || ""
-            }
+            })
         });
     } catch {
         // Feedback recording is best-effort background
