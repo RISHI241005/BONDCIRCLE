@@ -7,6 +7,9 @@ public class ConversationStateDto {
     private String engagement;
     private String language;
     private boolean dry;
+    private String stage;
+    private boolean hasUnansweredQuestion;
+    private String unansweredQuestionText;
 
     public ConversationStateDto() {
     }
@@ -17,6 +20,26 @@ public class ConversationStateDto {
         this.engagement = engagement;
         this.language = language;
         this.dry = dry;
+        this.stage = dry ? "DRY" : "CASUAL";
+    }
+
+    public ConversationStateDto(
+            String topic,
+            String tone,
+            String engagement,
+            String language,
+            boolean dry,
+            String stage,
+            boolean hasUnansweredQuestion,
+            String unansweredQuestionText) {
+        this.topic = topic;
+        this.tone = tone;
+        this.engagement = engagement;
+        this.language = language;
+        this.dry = dry;
+        this.stage = stage;
+        this.hasUnansweredQuestion = hasUnansweredQuestion;
+        this.unansweredQuestionText = unansweredQuestionText;
     }
 
     public String getTopic() {
@@ -57,5 +80,33 @@ public class ConversationStateDto {
 
     public void setDry(boolean dry) {
         this.dry = dry;
+    }
+
+    public String getStage() {
+        return stage;
+    }
+
+    public void setStage(String stage) {
+        this.stage = stage;
+    }
+
+    public boolean isHasUnansweredQuestion() {
+        return hasUnansweredQuestion;
+    }
+
+    public boolean hasUnansweredQuestion() {
+        return hasUnansweredQuestion;
+    }
+
+    public void setHasUnansweredQuestion(boolean hasUnansweredQuestion) {
+        this.hasUnansweredQuestion = hasUnansweredQuestion;
+    }
+
+    public String getUnansweredQuestionText() {
+        return unansweredQuestionText;
+    }
+
+    public void setUnansweredQuestionText(String unansweredQuestionText) {
+        this.unansweredQuestionText = unansweredQuestionText;
     }
 }

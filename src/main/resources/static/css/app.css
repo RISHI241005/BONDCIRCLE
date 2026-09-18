@@ -2960,12 +2960,44 @@ mark.chat-highlight {
     transform: translateY(-1px);
 }
 
-.reply-coach-card-text {
+.reply-coach-card-content {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.reply-coach-card-text {
     font-size: 0.84rem;
     line-height: 1.42;
     color: #1e293b;
     word-break: break-word;
+}
+
+.reply-coach-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    letter-spacing: 0.02em;
+    padding: 0.12rem 0.5rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    width: fit-content;
+    border: 1px solid #e2e8f0;
+}
+
+body.dark .reply-coach-card-text {
+    color: #e2e8f0;
+}
+
+body.dark .reply-coach-tag {
+    background: rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .reply-coach-card-actions {

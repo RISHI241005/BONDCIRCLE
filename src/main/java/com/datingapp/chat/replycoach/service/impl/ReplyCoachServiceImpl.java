@@ -1,6 +1,7 @@
 package com.datingapp.chat.replycoach.service.impl;
 
 import com.datingapp.chat.block.repository.BlockRepository;
+import com.datingapp.chat.common.exception.BadRequestException;
 import com.datingapp.chat.common.exception.ErrorCode;
 import com.datingapp.chat.common.exception.ForbiddenException;
 import com.datingapp.chat.common.exception.ResourceNotFoundException;
@@ -15,44 +16,37 @@ import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
 import com.datingapp.chat.replycoach.dto.ReplySuggestionResponse;
 import com.datingapp.chat.replycoach.entity.AiReplyFeedback;
 import com.datingapp.chat.replycoach.entity.FeedbackAction;
+import com.datingapp.chat.replycoach.model.ConversationAnalysis;
+import com.datingapp.chat.replycoach.model.ConversationContext;
+import com.datingapp.chat.replycoach.model.ReplyStrategy;
+import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import com.datingapp.chat.replycoach.provider.AIReplyProvider;
 import com.datingapp.chat.replycoach.repository.AiReplyFeedbackRepository;
 import com.datingapp.chat.replycoach.service.AiReplyFeedbackRecorder;
+import com.datingapp.chat.replycoach.service.ConversationIntelligenceService;
+import com.datingapp.chat.replycoach.service.ReplyCoachQualityFilter;
+import com.datingapp.chat.replycoach.service.ReplyCoachRateLimiter;
 import com.datingapp.chat.replycoach.service.ReplyCoachService;
+import com.datingapp.chat.replycoach.service.UserStyleEngine;
 import com.datingapp.chat.security.User;
 import com.datingapp.chat.security.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 @Service
 public class ReplyCoachServiceImpl implements ReplyCoachService {
 
     private static final Logger log = LoggerFactory.getLogger(ReplyCoachServiceImpl.class);
     private static final int MAX_CONTEXT_MESSAGES = 20;
-
-    private static final Set<String> DRY_WORDS = Set.of(
-            "k", "ok", "okay", "yeah", "yea", "yup", "cool", "hmm", "hm", "nice",
-            "fine", "yep", "sure", "lol", "haha", "kk", "np", "alright", "oh", "accha", "haan"
-    );
-
-    private static final Pattern HINGLISH_PATTERN = Pattern.compile(
-            "\\b(kya|hai|nahi|nahin|yaar|chal|accha|acha|haan|han|bhai|theek|thik|kaise|kaisa|kaha|kahan|kuch|hoga|raha|rahi|rahe|meri|mera|mere|tere|tera|teri|apna|apni|sab|matlab|shuru|suno|sun|aaj|kal|parso|waise|badiya|mast|fasa|bata|batao)\\b",
-            Pattern.CASE_INSENSITIVE
-    );
 
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
@@ -62,6 +56,10 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
     private final AiReplyFeedbackRepository feedbackRepository;
     private final AIReplyProvider aiReplyProvider;
     private final AiReplyFeedbackRecorder feedbackRecorder;
+    private final ConversationIntelligenceService conversationIntelligenceService;
+    private final UserStyleEngine userStyleEngine;
+    private final ReplyCoachQualityFilter qualityFilter;
+    private final ReplyCoachRateLimiter rateLimiter;
 
     @Autowired
     public ReplyCoachServiceImpl(
@@ -72,7 +70,11 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
             BlockRepository blockRepository,
             AiReplyFeedbackRepository feedbackRepository,
             AIReplyProvider aiReplyProvider,
-            AiReplyFeedbackRecorder feedbackRecorder) {
+            AiReplyFeedbackRecorder feedbackRecorder,
+            ConversationIntelligenceService conversationIntelligenceService,
+            UserStyleEngine userStyleEngine,
+            ReplyCoachQualityFilter qualityFilter,
+            ReplyCoachRateLimiter rateLimiter) {
         this.conversationRepository = conversationRepository;
         this.participantRepository = participantRepository;
         this.messageRepository = messageRepository;
@@ -81,6 +83,25 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
         this.feedbackRepository = feedbackRepository;
         this.aiReplyProvider = aiReplyProvider;
         this.feedbackRecorder = feedbackRecorder != null ? feedbackRecorder : new AiReplyFeedbackRecorder(feedbackRepository);
+        this.conversationIntelligenceService = conversationIntelligenceService != null ? conversationIntelligenceService : new ConversationIntelligenceService();
+        this.userStyleEngine = userStyleEngine != null ? userStyleEngine : new UserStyleEngine(feedbackRepository);
+        this.qualityFilter = qualityFilter != null ? qualityFilter : new ReplyCoachQualityFilter();
+        this.rateLimiter = rateLimiter != null ? rateLimiter : new ReplyCoachRateLimiter();
+    }
+
+    public ReplyCoachServiceImpl(
+            ConversationRepository conversationRepository,
+            ConversationParticipantRepository participantRepository,
+            MessageRepository messageRepository,
+            UserRepository userRepository,
+            BlockRepository blockRepository,
+            AiReplyFeedbackRepository feedbackRepository,
+            AIReplyProvider aiReplyProvider,
+            AiReplyFeedbackRecorder feedbackRecorder) {
+        this(conversationRepository, participantRepository, messageRepository, userRepository, blockRepository,
+                feedbackRepository, aiReplyProvider, feedbackRecorder,
+                new ConversationIntelligenceService(), new UserStyleEngine(feedbackRepository),
+                new ReplyCoachQualityFilter(), new ReplyCoachRateLimiter());
     }
 
     public ReplyCoachServiceImpl(
@@ -91,7 +112,10 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
             BlockRepository blockRepository,
             AiReplyFeedbackRepository feedbackRepository,
             AIReplyProvider aiReplyProvider) {
-        this(conversationRepository, participantRepository, messageRepository, userRepository, blockRepository, feedbackRepository, aiReplyProvider, new AiReplyFeedbackRecorder(feedbackRepository));
+        this(conversationRepository, participantRepository, messageRepository, userRepository, blockRepository,
+                feedbackRepository, aiReplyProvider, new AiReplyFeedbackRecorder(feedbackRepository),
+                new ConversationIntelligenceService(), new UserStyleEngine(feedbackRepository),
+                new ReplyCoachQualityFilter(), new ReplyCoachRateLimiter());
     }
 
     @Override
@@ -142,6 +166,12 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
 
         int limit = Math.max(1, Math.min(requestedLimit, 3));
 
+        // 0. Rate limit check (20 requests per minute)
+        if (!rateLimiter.tryAcquire(userId)) {
+            log.warn("Rate limit exceeded for user {}", userId);
+            throw new BadRequestException("You are requesting AI suggestions too frequently. Please wait a moment.", ErrorCode.RATE_LIMIT_EXCEEDED);
+        }
+
         // 1. Authenticate and verify conversation access
         Conversation conversation = conversationRepository.findByPublicId(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -167,65 +197,100 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
         List<Message> chronologicalMessages = new ArrayList<>(rawMessages.stream()
                 .filter(m -> !m.isDeleted())
                 .toList());
-        Collections.reverse(chronologicalMessages); // Reverse to get chronological order (oldest to newest)
+        Collections.reverse(chronologicalMessages); // Chronological order (oldest to newest)
 
-        // 4. Identify sender of every message & build dialogue
+        // 4. Build ConversationContext
+        List<ConversationContext.ContextMessage> contextMessages = new ArrayList<>();
         List<String> formattedDialogue = new ArrayList<>();
-        List<Message> currentUserMessages = new ArrayList<>();
-        Message lastMessage = null;
-
         for (Message msg : chronologicalMessages) {
             String content = msg.getContent() != null ? msg.getContent().trim() : "";
             if (content.isEmpty()) continue;
-
-            if (msg.getSenderId().equals(userId)) {
+            boolean isCurrentUser = msg.getSenderId().equals(userId);
+            contextMessages.add(new ConversationContext.ContextMessage(
+                    msg.getId(),
+                    msg.getPublicId(),
+                    msg.getSenderId(),
+                    content,
+                    isCurrentUser,
+                    msg.getCreatedAt()
+            ));
+            if (isCurrentUser) {
                 formattedDialogue.add("CURRENT_USER (YOU): " + content);
-                currentUserMessages.add(msg);
             } else {
                 formattedDialogue.add("OTHER_USER: " + content);
             }
-            lastMessage = msg;
-        }
-
-        // 5. Language detection (English vs Hinglish)
-        String detectedLanguage = detectLanguage(chronologicalMessages);
-
-        // 6. Dry conversation detection
-        boolean isDry = isDryConversation(lastMessage, chronologicalMessages, userId);
-
-        // 7. User style analysis & Personalization from feedback
-        String userStyleHints = analyzeUserStyle(currentUserMessages, userId);
-
-        // 8. Compile rejected texts list
-        List<String> combinedRejectedTexts = new ArrayList<>();
-        if (rejectedTextsParam != null) {
-            combinedRejectedTexts.addAll(rejectedTextsParam);
         }
 
         String userInterests = currentUser != null ? currentUser.getInterests() : "";
         String partnerInterests = otherUser != null ? otherUser.getInterests() : "";
 
-        // 9. Call AI Reply Provider
-        Optional<AIReplyProvider.GenerationResult> aiResult = aiReplyProvider.generateSuggestions(
-                formattedDialogue,
-                detectedLanguage,
-                isDry,
-                combinedRejectedTexts,
-                userStyleHints,
+        ConversationContext context = new ConversationContext(
+                conversationId,
+                userId,
+                otherUserId,
                 userInterests,
                 partnerInterests,
+                contextMessages
+        );
+
+        // 5. Run Conversation Intelligence & User Writing Style Engine
+        ConversationAnalysis analysis = conversationIntelligenceService.analyze(context);
+        UserWritingProfile styleProfile = userStyleEngine.analyzeStyle(userId, contextMessages, analysis.language());
+
+        // 6. Compile rejected texts list
+        List<String> combinedRejectedTexts = new ArrayList<>();
+        if (rejectedTextsParam != null) {
+            combinedRejectedTexts.addAll(rejectedTextsParam);
+        }
+        if (rejectedIds != null && !rejectedIds.isEmpty()) {
+            try {
+                List<String> textsFromIds = feedbackRepository.findSuggestionTextsByIds(rejectedIds);
+                if (textsFromIds != null) {
+                    for (String t : textsFromIds) {
+                        if (t != null && !t.isBlank() && !combinedRejectedTexts.contains(t)) {
+                            combinedRejectedTexts.add(t);
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.debug("Could not resolve rejected suggestion texts by IDs: {}", ex.getMessage());
+            }
+        }
+
+        // 7. Call AI Reply Provider with rich context
+        Optional<AIReplyProvider.GenerationResult> aiResult = aiReplyProvider.generateSuggestions(
+                context,
+                analysis,
+                styleProfile,
+                combinedRejectedTexts,
                 limit
         );
 
+        // Backward-compatibility: if the advanced call returns empty, check legacy dialogue method (for tests mocking legacy method)
+        if (aiResult.isEmpty()) {
+            aiResult = aiReplyProvider.generateSuggestions(
+                    formattedDialogue,
+                    analysis.language(),
+                    analysis.isDry(),
+                    combinedRejectedTexts,
+                    styleProfile.promptDirectives(),
+                    userInterests,
+                    partnerInterests,
+                    limit
+            );
+        }
+
         if (aiResult.isPresent() && !aiResult.get().suggestions().isEmpty()) {
-            List<ReplySuggestionItem> validSuggestions = filterValidSuggestions(
+            List<ReplySuggestionItem> validSuggestions = qualityFilter.filter(
                     aiResult.get().suggestions(), combinedRejectedTexts, limit);
 
             if (!validSuggestions.isEmpty()) {
                 // Auto-record SHOWN feedback
                 recordShownFeedbackAsync(userId, conversationId, validSuggestions);
 
+                String generationId = "gen_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
                 return new ReplySuggestionResponse(
+                        generationId,
                         conversationId,
                         validSuggestions,
                         aiResult.get().state()
@@ -233,21 +298,33 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
             }
         }
 
-        // 10. Fallback generation (deterministic, intelligent, non-repetitive)
-        List<ReplySuggestionItem> fallbackSuggestions = generateFallbackReplies(
-                lastMessage, userId, detectedLanguage, isDry, userInterests, partnerInterests, combinedRejectedTexts, limit);
+        // 8. Fallback generation (deterministic, intelligent, non-repetitive)
+        List<ReplySuggestionItem> fallbackCandidates = generateFallbackReplies(
+                context, analysis, styleProfile, combinedRejectedTexts, limit);
+
+        List<ReplySuggestionItem> fallbackSuggestions = qualityFilter.filter(
+                fallbackCandidates, combinedRejectedTexts, limit);
+
+        if (fallbackSuggestions.isEmpty()) {
+            fallbackSuggestions = fallbackCandidates.subList(0, Math.min(limit, fallbackCandidates.size()));
+        }
 
         ConversationStateDto fallbackState = new ConversationStateDto(
-                chronologicalMessages.isEmpty() ? "Introduction" : "Catching up",
-                isDry ? "Re-energizing" : "Warm",
-                isDry ? "DRY" : (chronologicalMessages.isEmpty() ? "NEW" : "BALANCED"),
-                detectedLanguage,
-                isDry
+                analysis.primaryTopic(),
+                analysis.tone(),
+                analysis.isDry() ? "DRY" : (context.isEmpty() ? "NEW" : "BALANCED"),
+                analysis.language(),
+                analysis.isDry(),
+                analysis.stage().name(),
+                analysis.hasUnansweredQuestion(),
+                analysis.lastQuestionText()
         );
 
         recordShownFeedbackAsync(userId, conversationId, fallbackSuggestions);
 
+        String generationId = "gen_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         return new ReplySuggestionResponse(
+                generationId,
                 conversationId,
                 fallbackSuggestions,
                 fallbackState
@@ -271,223 +348,355 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
         feedbackRecorder.recordBatch(records);
     }
 
-    private List<ReplySuggestionItem> filterValidSuggestions(
-            List<ReplySuggestionItem> suggestions,
-            List<String> rejectedTexts,
-            int limit) {
-
-        Set<String> normalizedRejected = new HashSet<>();
-        for (String r : rejectedTexts) {
-            if (r != null) normalizedRejected.add(r.trim().toLowerCase(Locale.ROOT));
-        }
-
-        List<ReplySuggestionItem> result = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-
-        for (ReplySuggestionItem item : suggestions) {
-            if (item.getText() == null || item.getText().isBlank()) continue;
-            String normalized = item.getText().trim().toLowerCase(Locale.ROOT);
-            if (!normalizedRejected.contains(normalized) && !seen.contains(normalized)) {
-                seen.add(normalized);
-                result.add(item);
-            }
-            if (result.size() >= limit) {
-                break;
-            }
-        }
-        return result;
-    }
-
-    private String detectLanguage(List<Message> messages) {
-        int hinglishCount = 0;
-        int totalWords = 0;
-
-        for (Message msg : messages) {
-            String text = msg.getContent();
-            if (text == null) continue;
-            String[] words = text.split("\\s+");
-            for (String w : words) {
-                totalWords++;
-                if (HINGLISH_PATTERN.matcher(w).find()) {
-                    hinglishCount++;
-                }
-            }
-        }
-
-        if (totalWords > 0 && (double) hinglishCount / totalWords >= 0.10) {
-            return "HINGLISH";
-        }
-        return "ENGLISH";
-    }
-
-    private boolean isDryConversation(Message lastMessage, List<Message> messages, Long currentUserId) {
-        if (lastMessage == null) return false;
-
-        // If the other person spoke last and sent a single dry word
-        if (!lastMessage.getSenderId().equals(currentUserId)) {
-            String content = lastMessage.getContent() != null ? lastMessage.getContent().trim().toLowerCase(Locale.ROOT) : "";
-            if (DRY_WORDS.contains(content) || (content.length() <= 8 && !content.contains("?"))) {
-                return true;
-            }
-        }
-
-        // Check if last 3 messages from other user were very short
-        int shortOtherUserMessages = 0;
-        int checked = 0;
-        for (int i = messages.size() - 1; i >= 0 && checked < 5; i--) {
-            Message m = messages.get(i);
-            if (!m.getSenderId().equals(currentUserId)) {
-                checked++;
-                String c = m.getContent() != null ? m.getContent().trim() : "";
-                if (c.length() <= 12) {
-                    shortOtherUserMessages++;
-                }
-            }
-        }
-
-        return shortOtherUserMessages >= 3;
-    }
-
-    private String analyzeUserStyle(List<Message> userMessages, Long userId) {
-        StringBuilder hints = new StringBuilder();
-
-        // 1. Check feedback history for personalized traits
-        try {
-            List<String> usedTexts = feedbackRepository.findRecentUsedTexts(userId, PageRequest.of(0, 8));
-            if (!usedTexts.isEmpty()) {
-                boolean prefersEmojis = usedTexts.stream().anyMatch(t -> t.codePoints().anyMatch(Character::isEmoji));
-                int avgLength = (int) usedTexts.stream().mapToInt(String::length).average().orElse(30);
-                if (avgLength < 35) {
-                    hints.append("User repeatedly chooses short, punchy replies. ");
-                } else {
-                    hints.append("User appreciates thoughtful, expressive replies. ");
-                }
-                if (prefersEmojis) {
-                    hints.append("Include natural emojis where fitting. ");
-                }
-            }
-        } catch (Exception ex) {
-            log.debug("Feedback analysis skipped: {}", ex.getMessage());
-        }
-
-        // 2. Inspect sent messages
-        if (!userMessages.isEmpty()) {
-            boolean usesEmojis = false;
-            int totalLength = 0;
-            for (Message m : userMessages) {
-                String c = m.getContent() != null ? m.getContent() : "";
-                totalLength += c.length();
-                if (!usesEmojis && c.codePoints().anyMatch(Character::isEmoji)) {
-                    usesEmojis = true;
-                }
-            }
-            int avgMsgLen = totalLength / userMessages.size();
-            if (avgMsgLen <= 25) {
-                hints.append("Keep replies casual, relaxed and brief. ");
-            }
-            if (usesEmojis) {
-                hints.append("Use emojis occasionally like the user does. ");
-            }
-        }
-
-        return hints.toString().trim();
-    }
-
     private List<ReplySuggestionItem> generateFallbackReplies(
-            Message lastMessage,
-            Long currentUserId,
-            String language,
-            boolean isDry,
-            String userInterests,
-            String partnerInterests,
+            ConversationContext context,
+            ConversationAnalysis analysis,
+            UserWritingProfile styleProfile,
             List<String> rejectedTexts,
             int limit) {
 
         List<ReplySuggestionItem> candidates = new ArrayList<>();
-        boolean isHinglish = "HINGLISH".equalsIgnoreCase(language);
+        boolean isHinglish = "HINGLISH".equalsIgnoreCase(analysis.language());
+        String partnerInterests = context.partnerInterests();
 
-        if (lastMessage == null) {
+        if (context.isEmpty()) {
             // Fresh conversation / Icebreaker fallback
             if (partnerInterests != null && !partnerInterests.isBlank()) {
                 String interest = partnerInterests.split("\\|")[0].trim();
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Hey! Saw you're into " + interest + " — what's your favorite thing about it?", "Interests", "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Hey! Saw you're into " + interest + " — what's your favorite thing about it?",
+                        "Interests", "Curious",
+                        ReplyStrategy.CURIOUS.name(), "Curious"));
             } else {
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Hey! How's your week treating you so far? 😊", "Greeting", "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Hey! How's your week treating you so far? 😊",
+                        "Greeting", "Warm",
+                        ReplyStrategy.SUPPORTIVE.name(), "Warm"));
             }
-            candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                    "Coffee or tea person? Need to know before we talk further! 👀", "Icebreaker", "Playful"));
-            candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                    "Random question: what's one place you've always wanted to travel to?", "Travel", "Curious"));
-            candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                    "Hey there! What's been the highlight of your day today?", "Day", "Friendly"));
-        } else if (isDry) {
+            candidates.add(new ReplySuggestionItem(
+                    UUID.randomUUID().toString(),
+                    "Coffee or tea person? Need to know before we talk further! 👀",
+                    "Icebreaker", "Playful",
+                    ReplyStrategy.PLAYFUL.name(), "Playful"));
+            candidates.add(new ReplySuggestionItem(
+                    UUID.randomUUID().toString(),
+                    "Random question: what's one place you've always wanted to travel to?",
+                    "Travel", "Curious",
+                    ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+            candidates.add(new ReplySuggestionItem(
+                    UUID.randomUUID().toString(),
+                    "Hey there! What's been the highlight of your day today?",
+                    "Day", "Friendly",
+                    ReplyStrategy.THOUGHTFUL.name(), "Friendly"));
+        } else if (analysis.isDry()) {
             // Dry conversation re-openers
             if (isHinglish) {
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Arre itna serious 'haan'? 😂 Sab theek na?", "Banter", "Playful"));
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Waise aaj din bhar kya kiya? Kuch interesting?", "Curiosity", "Curious"));
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Lagta hai kaafi thake huye ho aaj! Kya chal raha hai?", "Warmth", "Warm"));
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Haha details se overwhelm mat karo mujhe! Batao sach me kya hua?", "Humor", "Playful"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Arre itna serious 'haan'? 😂 Sab theek na?",
+                        "Banter", "Playful",
+                        ReplyStrategy.BANTER.name(), "Playful"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Waise aaj din bhar kya kiya? Kuch interesting?",
+                        "Curiosity", "Curious",
+                        ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Lagta hai kaafi thake huye ho aaj! Kya chal raha hai?",
+                        "Warmth", "Warm",
+                        ReplyStrategy.EMPATHIZE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Haha details se overwhelm mat karo mujhe! Batao sach me kya hua?",
+                        "Humor", "Playful",
+                        ReplyStrategy.PLAYFUL.name(), "Witty"));
             } else {
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Okay that's a very concise reply 😂 What's actually going on today?", "Humor", "Playful"));
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Haha don't overwhelm me with all the details! What are you up to?", "Banter", "Playful"));
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Random question to shake things up — what made you smile today?", "Curiosity", "Curious"));
-                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                        "Sounds like a long day! Doing anything fun tonight to unwind?", "Empathy", "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Okay that's a very concise reply 😂 What's actually going on today?",
+                        "Humor", "Playful",
+                        ReplyStrategy.BANTER.name(), "Playful"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Haha don't overwhelm me with all the details! What are you up to?",
+                        "Banter", "Playful",
+                        ReplyStrategy.PLAYFUL.name(), "Witty"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Random question to shake things up — what made you smile today?",
+                        "Curiosity", "Curious",
+                        ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Sounds like a long day! Doing anything fun tonight to unwind?",
+                        "Empathy", "Warm",
+                        ReplyStrategy.SUPPORTIVE.name(), "Warm"));
+            }
+        } else if (analysis.hasUnansweredQuestion()) {
+            // Direct answers to the question asked by the other user
+            String topic = analysis.primaryTopic();
+            if ("Sports & Fitness".equals(topic)) {
+                if (isHinglish) {
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Haan dekha tha! Kya crazy finish tha match ka!",
+                            "Sports", "Excited",
+                            ReplyStrategy.ANSWER.name(), "Playful"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Sach bataun toh pura match nahi dekh paya, score kya raha?",
+                            "Sports", "Curious",
+                            ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Haan! Tum kis team ko support kar rahe the?",
+                            "Sports", "Playful",
+                            ReplyStrategy.PLAYFUL.name(), "Playful"));
+                } else {
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Yes I did! That match was absolute madness!",
+                            "Sports", "Excited",
+                            ReplyStrategy.ANSWER.name(), "Playful"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "I caught the highlights! Which team were you rooting for?",
+                            "Sports", "Curious",
+                            ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Yes! Can't believe how that game turned out. Did you enjoy it?",
+                            "Sports", "Engaged",
+                            ReplyStrategy.THOUGHTFUL.name(), "Warm"));
+                }
+            } else if ("Studies & Academics".equals(topic)) {
+                if (isHinglish) {
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Haan bas chal raha hai! Tumhara kitna prep hua?",
+                            "Studies", "Curious",
+                            ReplyStrategy.ANSWER.name(), "Warm"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Almost done! Par kaafi intense lag raha hai abhi.",
+                            "Studies", "Direct",
+                            ReplyStrategy.ANSWER.name(), "Thoughtful"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Haha mat pucho! Study break lene ka mann kar raha hai 😂",
+                            "Studies", "Playful",
+                            ReplyStrategy.BANTER.name(), "Playful"));
+                } else {
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Making good progress on it! How is yours going?",
+                            "Studies", "Curious",
+                            ReplyStrategy.ANSWER.name(), "Warm"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Almost done with it, though it's been pretty intense today!",
+                            "Studies", "Direct",
+                            ReplyStrategy.ANSWER.name(), "Thoughtful"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Haha don't ask! Already dreaming about a study break 😂",
+                            "Studies", "Playful",
+                            ReplyStrategy.BANTER.name(), "Playful"));
+                }
+            } else if (isHinglish) {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Haha accha sawal hai! Honestly, situation pe depend karta hai.",
+                        "Direct", "Playful",
+                        ReplyStrategy.ANSWER.name(), "Playful"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Sach bataun toh haan! Tumhara kya opinion hai ispe?",
+                        "Curious", "Curious",
+                        ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Maine is baare me kabhi socha nahi tha, par ab sochna padega 😂",
+                        "Thoughtful", "Humorous",
+                        ReplyStrategy.THOUGHTFUL.name(), "Playful"));
+            } else {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Haha great question! Honestly, it depends on the day 😂",
+                        "Direct", "Playful",
+                        ReplyStrategy.ANSWER.name(), "Playful"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "To be completely honest, yes! What's your take on it though?",
+                        "Curious", "Curious",
+                        ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "I hadn't thought about that before, but now I'm intrigued!",
+                        "Thoughtful", "Thoughtful",
+                        ReplyStrategy.THOUGHTFUL.name(), "Thoughtful"));
+            }
+        } else if (analysis.stage() == ConversationAnalysis.Stage.RECONNECTING || analysis.intent() == ConversationAnalysis.Intent.RECONNECTING) {
+            // Natural reconnection after conversation gap
+            if (isHinglish) {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Hey stranger! Look who's back 😊 Kaise ho?",
+                        "Reconnection", "Warm",
+                        ReplyStrategy.SUPPORTIVE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Hey! Itne dino baad! Sab theek chal raha hai na?",
+                        "Catchup", "Curious",
+                        ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Look who finally remembered me! 😂 Kya chal raha hai aaj kal?",
+                        "Banter", "Playful",
+                        ReplyStrategy.BANTER.name(), "Playful"));
+            } else {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Hey stranger! Look who's back 😊 How have you been?",
+                        "Reconnection", "Warm",
+                        ReplyStrategy.SUPPORTIVE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Hey! Was just thinking about you earlier. How are things with you?",
+                        "Catchup", "Thoughtful",
+                        ReplyStrategy.THOUGHTFUL.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Look who's back from the dead! 😂 What have you been up to?",
+                        "Banter", "Playful",
+                        ReplyStrategy.BANTER.name(), "Playful"));
+            }
+        } else if (analysis.intent() == ConversationAnalysis.Intent.EMOTIONAL_SUPPORT) {
+            // Compassionate empathetic responses for tough/exhausting days
+            if (isHinglish) {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Arre, I'm so sorry! Kaafi rough lag raha hai. Sab theek na?",
+                        "Empathy", "Empathetic",
+                        ReplyStrategy.EMPATHIZE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Aisa kya hua yaar? If you want to vent, I'm right here to listen.",
+                        "Support", "Supportive",
+                        ReplyStrategy.SUPPORTIVE.name(), "Thoughtful"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Take a deep breath! Aaj aaram karo thoda, kal better hoga ❤️",
+                        "Comfort", "Warm",
+                        ReplyStrategy.SUPPORTIVE.name(), "Warm"));
+            } else {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "I'm so sorry, that sounds really rough. Are you holding up okay?",
+                        "Empathy", "Empathetic",
+                        ReplyStrategy.EMPATHIZE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Oh no, what happened? If you need to vent, I'm here to listen.",
+                        "Support", "Supportive",
+                        ReplyStrategy.SUPPORTIVE.name(), "Thoughtful"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Sending you good vibes! Hopefully you can relax and unwind tonight.",
+                        "Comfort", "Warm",
+                        ReplyStrategy.SUPPORTIVE.name(), "Warm"));
             }
         } else {
-            // Active dialogue replies
-            String lastText = lastMessage.getContent() != null ? lastMessage.getContent() : "";
-            boolean isQuestion = lastText.contains("?");
-
-            if (isHinglish) {
-                if (isQuestion) {
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "Haha accha sawal hai! Honestly, situation pe depend karta hai.", "Direct", "Playful"));
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "Sach bataun toh haan! Tumhara kya opinion hai ispe?", "Curious", "Curious"));
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "Maine is baare me kabhi socha nahi tha, par ab sochna padega 😂", "Thoughtful", "Humorous"));
+            // Active ongoing dialogue (including topic continuity)
+            String topic = analysis.primaryTopic();
+            if ("Sports & Fitness".equals(topic)) {
+                if (isHinglish) {
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Match dekha tha kya? Kaafi crazy finish tha!",
+                            "Sports", "Curious",
+                            ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Haha totally agree! Tum kis team ko support karte ho?",
+                            "Sports", "Playful",
+                            ReplyStrategy.PLAYFUL.name(), "Playful"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Game on! Next match saath me dekhna padega 👀",
+                            "Sports", "Warm",
+                            ReplyStrategy.BANTER.name(), "Warm"));
                 } else {
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "Arre waah, yeh toh kaafi cool hai! Aur batao?", "Engage", "Warm"));
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "Haha seriously? Mujhe bilkul expected nahi tha yeh!", "Surprise", "Playful"));
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "Bilkul sahi kaha tumne, I totally agree with you on this!", "Agreement", "Thoughtful"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Did you watch the match? That finish was absolute madness!",
+                            "Sports", "Curious",
+                            ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Haha 100%! Which team do you root for the most?",
+                            "Sports", "Playful",
+                            ReplyStrategy.PLAYFUL.name(), "Playful"));
+                    candidates.add(new ReplySuggestionItem(
+                            UUID.randomUUID().toString(),
+                            "Game on! We definitely have to debate this over coffee 👀",
+                            "Sports", "Warm",
+                            ReplyStrategy.BANTER.name(), "Warm"));
                 }
+            } else if ("Studies & Academics".equals(topic)) {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Haha that sounds like quite a journey! What are you studying?",
+                        "Studies", "Curious",
+                        ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "College can be an absolute whirlwind! How are classes going?",
+                        "Studies", "Supportive",
+                        ReplyStrategy.SUPPORTIVE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Respect! That definitely takes a lot of dedication 👏",
+                        "Studies", "Thoughtful",
+                        ReplyStrategy.THOUGHTFUL.name(), "Thoughtful"));
+            } else if (isHinglish) {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Arre waah, yeh toh kaafi cool hai! Aur batao?",
+                        "Engage", "Warm",
+                        ReplyStrategy.SUPPORTIVE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Haha seriously? Mujhe bilkul expected nahi tha yeh!",
+                        "Surprise", "Playful",
+                        ReplyStrategy.PLAYFUL.name(), "Playful"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Bilkul sahi kaha tumne, I totally agree with you on this!",
+                        "Agreement", "Thoughtful",
+                        ReplyStrategy.THOUGHTFUL.name(), "Thoughtful"));
             } else {
-                if (isQuestion) {
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "Haha great question! Honestly, it depends on the day 😂", "Direct", "Playful"));
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "To be completely honest, yes! What's your take on it though?", "Curious", "Curious"));
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "I hadn't thought about that before, but now I'm intrigued!", "Thoughtful", "Thoughtful"));
-                } else {
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "Haha no way! What happened after that?", "Story", "Curious"));
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "That sounds awesome! I completely agree with you on that.", "Supportive", "Warm"));
-                    candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
-                            "Okay now you definitely have my full attention 👀", "Teasing", "Playful"));
-                }
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Haha no way! What happened after that?",
+                        "Story", "Curious",
+                        ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "That sounds awesome! I completely agree with you on that.",
+                        "Supportive", "Warm",
+                        ReplyStrategy.SUPPORTIVE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Okay now you definitely have my full attention 👀",
+                        "Teasing", "Playful",
+                        ReplyStrategy.BANTER.name(), "Playful"));
             }
         }
 
-        // Filter against rejected suggestions
-        List<ReplySuggestionItem> filtered = filterValidSuggestions(candidates, rejectedTexts, limit);
-        if (filtered.isEmpty()) {
-            return candidates.subList(0, Math.min(limit, candidates.size()));
-        }
-        return filtered;
+        return candidates;
     }
 }

@@ -14,6 +14,9 @@ import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
 import com.datingapp.chat.replycoach.dto.ReplySuggestionResponse;
 import com.datingapp.chat.replycoach.entity.AiReplyFeedback;
 import com.datingapp.chat.replycoach.entity.FeedbackAction;
+import com.datingapp.chat.replycoach.model.ConversationAnalysis;
+import com.datingapp.chat.replycoach.model.ConversationContext;
+import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import com.datingapp.chat.replycoach.provider.AIReplyProvider;
 import com.datingapp.chat.replycoach.repository.AiReplyFeedbackRepository;
 import com.datingapp.chat.replycoach.service.impl.ReplyCoachServiceImpl;
@@ -146,7 +149,7 @@ class ReplyCoachServiceTest {
         );
         ConversationStateDto aiState = new ConversationStateDto("Weekend Plans", "Friendly", "HIGH", "ENGLISH", false);
 
-        when(aiReplyProvider.generateSuggestions(anyList(), anyString(), anyBoolean(), anyList(), anyString(), anyString(), anyString(), eq(3)))
+        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationAnalysis.class), any(UserWritingProfile.class), anyList(), eq(3)))
                 .thenReturn(Optional.of(new AIReplyProvider.GenerationResult(aiItems, aiState)));
 
         ReplySuggestionResponse response = service.getReplySuggestions(conversationId, userId, 3);
@@ -178,7 +181,7 @@ class ReplyCoachServiceTest {
         m1.setCreatedAt(Instant.now().minusSeconds(30));
 
         when(messageRepository.findRecentMessages(eq(1L), anyInt())).thenReturn(List.of(m1));
-        when(aiReplyProvider.generateSuggestions(anyList(), anyString(), anyBoolean(), anyList(), anyString(), anyString(), anyString(), anyInt()))
+        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationAnalysis.class), any(UserWritingProfile.class), anyList(), anyInt()))
                 .thenReturn(Optional.empty());
 
         ReplySuggestionResponse response = service.getReplySuggestions(conversationId, userId, 3);
@@ -208,7 +211,7 @@ class ReplyCoachServiceTest {
         dryMsg.setCreatedAt(Instant.now().minusSeconds(10));
 
         when(messageRepository.findRecentMessages(eq(1L), anyInt())).thenReturn(List.of(dryMsg));
-        when(aiReplyProvider.generateSuggestions(anyList(), anyString(), eq(true), anyList(), anyString(), anyString(), anyString(), anyInt()))
+        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationAnalysis.class), any(UserWritingProfile.class), anyList(), anyInt()))
                 .thenReturn(Optional.empty()); // Trigger fallback with dry=true
 
         ReplySuggestionResponse response = service.getReplySuggestions(conversationId, userId, 3);
@@ -241,7 +244,7 @@ class ReplyCoachServiceTest {
                 new ReplySuggestionItem("s1", rejectedText, "Story", "Curious"),
                 new ReplySuggestionItem("s2", "Sounds like a plan! Where were you thinking?", "Lunch", "Warm")
         );
-        when(aiReplyProvider.generateSuggestions(anyList(), anyString(), anyBoolean(), anyList(), anyString(), anyString(), anyString(), anyInt()))
+        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationAnalysis.class), any(UserWritingProfile.class), anyList(), anyInt()))
                 .thenReturn(Optional.of(new AIReplyProvider.GenerationResult(aiItems, new ConversationStateDto("Lunch", "Warm", "BALANCED", "ENGLISH", false))));
 
         ReplySuggestionResponse response = service.regenerateReplySuggestions(

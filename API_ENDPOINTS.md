@@ -44,9 +44,9 @@
 
 | METHOD | URL | AUTH | REQUEST BODY | RESPONSE | ERROR RESPONSES | PURPOSE |
 |---|---|---|---|---|---|---|
-| POST | `/api/ai/reply-suggestions` | Yes | `{ "conversationId": String, "limit": 3 }` | `{ success: true, data: { conversationId, suggestions: [ { id, text, topic, tone } ], conversationState: { topic, tone, engagement, language, dry } } }` | 400, 401, 403, 404 | Analyze two-sided conversation history and generate up to 3 natural, ready-to-send replies |
-| POST | `/api/ai/reply-suggestions/regenerate` | Yes | `{ "conversationId": String, "rejectedSuggestionIds": String[], "rejectedTexts": String[], "limit": 3 }` | `{ success: true, data: { conversationId, suggestions: [ { id, text, topic, tone } ], conversationState: { ... } } }` | 400, 401, 403, 404 | Generate fresh alternative reply suggestions while strictly avoiding previously rejected ideas |
-| POST | `/api/ai/reply-suggestions/feedback` | Yes | `{ "suggestionId": String, "conversationId": String, "action": "USED" \| "REJECTED" \| "COPIED" \| "EDITED" \| "SENT", "suggestionText": String }` | `{ success: true, data: { status: "recorded", suggestionId, action } }` | 400, 401, 403 | Record user interaction for style personalization |
+| POST | `/api/ai/reply-suggestions` | Yes | `{ "conversationId": String, "limit": 3 }` | `{ success: true, data: { generationId: "gen_...", conversationId: String, suggestions: [ { id, text, topic, tone, strategy, style } ], conversationState: { topic, tone, engagement, language, dry, stage, hasUnansweredQuestion, unansweredQuestionText } } }` | 400, 401, 403, 404 | Analyze two-sided conversation history and generate up to 3 natural, ready-to-send replies |
+| POST | `/api/ai/reply-suggestions/regenerate` | Yes | `{ "conversationId": String, "rejectedSuggestionIds": String[], "rejectedTexts": String[], "limit": 3 }` | `{ success: true, data: { generationId: "gen_...", conversationId: String, suggestions: [ { id, text, topic, tone, strategy, style } ], conversationState: { ... } } }` | 400, 401, 403, 404 | Generate fresh alternative reply suggestions while strictly avoiding previously rejected ideas |
+| POST | `/api/ai/reply-suggestions/feedback` | Yes | `{ "suggestionId": String, "conversationId": String, "action": "SHOWN" \| "USED" \| "REJECTED" \| "COPIED" \| "EDITED" \| "SENT" \| "LIKED", "suggestionText": String }` | `{ success: true, data: { status: "recorded", suggestionId, action } }` | 400, 401, 403 | Record user interaction for style personalization |
 
 ### Interests and Ice Breakers
 

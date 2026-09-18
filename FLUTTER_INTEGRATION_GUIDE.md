@@ -271,12 +271,16 @@ class ReplySuggestionItem {
   final String text;
   final String? topic;
   final String? tone;
+  final String? strategy;
+  final String? style;
 
   ReplySuggestionItem({
     required this.id,
     required this.text,
     this.topic,
     this.tone,
+    this.strategy,
+    this.style,
   });
 
   factory ReplySuggestionItem.fromJson(Map<String, dynamic> json) {
@@ -285,6 +289,8 @@ class ReplySuggestionItem {
       text: json['text'] as String? ?? '',
       topic: json['topic'] as String?,
       tone: json['tone'] as String?,
+      strategy: json['strategy'] as String?,
+      style: json['style'] as String?,
     );
   }
 }
@@ -295,6 +301,9 @@ class ConversationStateInfo {
   final String engagement;
   final String language;
   final bool dry;
+  final String? stage;
+  final bool? hasUnansweredQuestion;
+  final String? unansweredQuestionText;
 
   ConversationStateInfo({
     required this.topic,
@@ -302,6 +311,9 @@ class ConversationStateInfo {
     required this.engagement,
     required this.language,
     required this.dry,
+    this.stage,
+    this.hasUnansweredQuestion,
+    this.unansweredQuestionText,
   });
 
   factory ConversationStateInfo.fromJson(Map<String, dynamic> json) {
@@ -311,16 +323,21 @@ class ConversationStateInfo {
       engagement: json['engagement'] as String? ?? 'BALANCED',
       language: json['language'] as String? ?? 'ENGLISH',
       dry: json['dry'] as bool? ?? false,
+      stage: json['stage'] as String?,
+      hasUnansweredQuestion: json['hasUnansweredQuestion'] as bool?,
+      unansweredQuestionText: json['unansweredQuestionText'] as String?,
     );
   }
 }
 
 class ReplySuggestionResponse {
+  final String generationId;
   final String conversationId;
   final List<ReplySuggestionItem> suggestions;
   final ConversationStateInfo? conversationState;
 
   ReplySuggestionResponse({
+    required this.generationId,
     required this.conversationId,
     required this.suggestions,
     this.conversationState,
@@ -332,6 +349,7 @@ class ReplySuggestionResponse {
         .map((e) => ReplySuggestionItem.fromJson(e as Map<String, dynamic>))
         .toList();
     return ReplySuggestionResponse(
+      generationId: data['generationId'] as String? ?? '',
       conversationId: data['conversationId'] as String? ?? '',
       suggestions: list,
       conversationState: data['conversationState'] != null
@@ -341,7 +359,61 @@ class ReplySuggestionResponse {
   }
 }
 
-enum ReplyFeedbackAction { SHOWN, USED, REJECTED, COPIED, EDITED, SENT }
+class ReplySuggestionRequest {
+  final String conversationId;
+  final int limit;
+
+  ReplySuggestionRequest({required this.conversationId, this.limit = 3});
+
+  Map<String, dynamic> toJson() => {
+    'conversationId': conversationId,
+    'limit': limit,
+  };
+}
+
+class ReplyRegenerateRequest {
+  final String conversationId;
+  final List<String> rejectedSuggestionIds;
+  final List<String> rejectedTexts;
+  final int limit;
+
+  ReplyRegenerateRequest({
+    required this.conversationId,
+    required this.rejectedSuggestionIds,
+    this.rejectedTexts = const [],
+    this.limit = 3,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'conversationId': conversationId,
+    'rejectedSuggestionIds': rejectedSuggestionIds,
+    'rejectedTexts': rejectedTexts,
+    'limit': limit,
+  };
+}
+
+class ReplyFeedbackRequest {
+  final String suggestionId;
+  final String conversationId;
+  final ReplyFeedbackAction action;
+  final String? suggestionText;
+
+  ReplyFeedbackRequest({
+    required this.suggestionId,
+    required this.conversationId,
+    required this.action,
+    this.suggestionText,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'suggestionId': suggestionId,
+    'conversationId': conversationId,
+    'action': action.name,
+    if (suggestionText != null) 'suggestionText': suggestionText,
+  };
+}
+
+enum ReplyFeedbackAction { SHOWN, USED, REJECTED, COPIED, EDITED, SENT, LIKED }
 ```
 
 ### 5.2 API Service (`reply_coach_service.dart`)

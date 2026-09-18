@@ -27,4 +27,7 @@ public interface AiReplyFeedbackRepository extends JpaRepository<AiReplyFeedback
     default List<String> findRecentRejectedTexts(Long userId, Pageable pageable) {
         return findRecentTextsByAction(userId, FeedbackAction.REJECTED, pageable);
     }
+
+    @Query("SELECT DISTINCT f.suggestionText FROM AiReplyFeedback f WHERE f.suggestionId IN :suggestionIds")
+    List<String> findSuggestionTextsByIds(@Param("suggestionIds") List<String> suggestionIds);
 }

@@ -3,10 +3,15 @@ package com.datingapp.chat.replycoach.provider;
 import com.datingapp.chat.config.AiAssistantProperties;
 import com.datingapp.chat.replycoach.dto.ConversationStateDto;
 import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
+import com.datingapp.chat.replycoach.model.ConversationAnalysis;
+import com.datingapp.chat.replycoach.model.ConversationContext;
+import com.datingapp.chat.replycoach.model.UserWritingProfile;
+import com.datingapp.chat.replycoach.service.ReplyCoachPromptBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -29,10 +34,16 @@ public class AIReplyProvider {
     private final AiAssistantProperties properties;
     private final ObjectMapper objectMapper;
     private final RestClient defaultRestClient;
+    private final ReplyCoachPromptBuilder promptBuilder;
 
-    public AIReplyProvider(AiAssistantProperties properties, ObjectMapper objectMapper) {
+    @Autowired
+    public AIReplyProvider(
+            AiAssistantProperties properties,
+            ObjectMapper objectMapper,
+            ReplyCoachPromptBuilder promptBuilder) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.promptBuilder = promptBuilder != null ? promptBuilder : new ReplyCoachPromptBuilder();
         Duration timeout = Duration.ofSeconds(Math.max(3, properties.getTimeoutSeconds()));
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(timeout);
@@ -41,6 +52,10 @@ public class AIReplyProvider {
                 .baseUrl(normalizeBaseUrl(properties.getBaseUrl()))
                 .requestFactory(requestFactory)
                 .build();
+    }
+
+    public AIReplyProvider(AiAssistantProperties properties, ObjectMapper objectMapper) {
+        this(properties, objectMapper, new ReplyCoachPromptBuilder());
     }
 
     private static String normalizeBaseUrl(String url) {
@@ -60,6 +75,62 @@ public class AIReplyProvider {
                 && !properties.getApiKey().isBlank();
     }
 
+    /**
+     * Advanced generation method using rich domain models and structured prompt builder.
+     */
+    public Optional<GenerationResult> generateSuggestions(
+            ConversationContext context,
+            ConversationAnalysis analysis,
+            UserWritingProfile styleProfile,
+            List<String> rejectedTexts,
+            int limit) {
+
+        if (!isConfigured()) {
+            log.info("AI Provider is not enabled or API key is not configured.");
+            return Optional.empty();
+        }
+
+        int targetCount = Math.max(1, Math.min(limit, 3));
+        String apiKey = properties.getApiKey().trim();
+        String baseUrl = normalizeBaseUrl(properties.getBaseUrl());
+        String model = properties.getModel() != null && !properties.getModel().isBlank()
+                ? properties.getModel().trim()
+                : "openai/gpt-oss-20b";
+
+        String systemPrompt = promptBuilder.buildSystemPrompt(targetCount, analysis, styleProfile);
+        String userPrompt = promptBuilder.buildUserPrompt(context, analysis, rejectedTexts);
+
+        try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("model", model);
+            body.put("messages", List.of(
+                    Map.of("role", "system", "content", systemPrompt),
+                    Map.of("role", "user", "content", userPrompt)
+            ));
+            body.put("response_format", Map.of("type", "json_object"));
+            body.put("max_tokens", 800);
+            body.put("temperature", 0.7);
+
+            String uri = baseUrl.endsWith("/chat/completions") ? "" : "/chat/completions";
+            JsonNode response = defaultRestClient.post()
+                    .uri(uri)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Authorization", "Bearer " + apiKey)
+                    .body(body)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            return parseAiResponse(response, targetCount, analysis);
+        } catch (Exception ex) {
+            log.warn("AI Reply Coach generation failed via {}: {}. Falling back to internal engine.",
+                    baseUrl, ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Backward-compatible generation method for dialogue string inputs.
+     */
     public Optional<GenerationResult> generateSuggestions(
             List<String> formattedDialogue,
             String detectedLanguage,
@@ -105,7 +176,7 @@ public class AIReplyProvider {
                     .retrieve()
                     .body(JsonNode.class);
 
-            return parseAiResponse(response, targetCount);
+            return parseAiResponse(response, targetCount, null);
         } catch (Exception ex) {
             log.warn("AI Reply Coach generation failed via {}: {}. Falling back to internal engine.",
                     baseUrl, ex.getMessage());
@@ -151,7 +222,9 @@ public class AIReplyProvider {
         sb.append("    {\n");
         sb.append("      \"text\": \"The exact draft reply message for the user to send.\",\n");
         sb.append("      \"topic\": \"Short sub-topic\",\n");
-        sb.append("      \"tone\": \"Playful | Curious | Warm\"\n");
+        sb.append("      \"tone\": \"Playful | Curious | Warm\",\n");
+        sb.append("      \"strategy\": \"ASK_FOLLOWUP | PLAYFUL | EMPATHIZE | ANSWER | BANTER | CURIOUS | SUPPORTIVE\",\n");
+        sb.append("      \"style\": \"Casual | Playful | Warm\"\n");
         sb.append("    }\n");
         sb.append("  ]\n");
         sb.append("}\n");
@@ -194,7 +267,7 @@ public class AIReplyProvider {
         return sb.toString();
     }
 
-    private Optional<GenerationResult> parseAiResponse(JsonNode response, int targetCount) {
+    private Optional<GenerationResult> parseAiResponse(JsonNode response, int targetCount, ConversationAnalysis analysis) {
         if (response == null) {
             return Optional.empty();
         }
@@ -218,14 +291,20 @@ public class AIReplyProvider {
             for (JsonNode item : suggestionsNode) {
                 String text = item.path("text").asText("").trim();
                 if (!text.isBlank() && text.length() <= 500) {
-                    // Check duplicate text in list
                     boolean exists = items.stream().anyMatch(i -> i.getText().equalsIgnoreCase(text));
                     if (!exists) {
+                        String topic = item.hasNonNull("topic") ? item.path("topic").asText("General") : "General";
+                        String tone = item.hasNonNull("tone") ? item.path("tone").asText("Conversational") : "Conversational";
+                        String strategy = item.hasNonNull("strategy") ? item.path("strategy").asText("CONVERSATIONAL") : "CONVERSATIONAL";
+                        String style = item.hasNonNull("style") ? item.path("style").asText(tone) : tone;
+
                         items.add(new ReplySuggestionItem(
                                 UUID.randomUUID().toString(),
                                 text,
-                                item.path("topic").asText("General"),
-                                item.path("tone").asText("Conversational")
+                                topic,
+                                tone,
+                                strategy,
+                                style
                         ));
                     }
                 }
@@ -238,12 +317,23 @@ public class AIReplyProvider {
                 return Optional.empty();
             }
 
+            String defaultStage = analysis != null ? analysis.stage().name() : "CASUAL";
+            boolean defaultHasQuestion = analysis != null && analysis.hasUnansweredQuestion();
+            String defaultQuestionText = analysis != null ? analysis.lastQuestionText() : null;
+
+            String stage = root.hasNonNull("stage") ? root.path("stage").asText(defaultStage) : defaultStage;
+            boolean hasQuestion = root.hasNonNull("hasUnansweredQuestion") ? root.path("hasUnansweredQuestion").asBoolean(defaultHasQuestion) : defaultHasQuestion;
+            String questionText = root.hasNonNull("unansweredQuestionText") ? root.path("unansweredQuestionText").asText(defaultQuestionText) : defaultQuestionText;
+
             ConversationStateDto state = new ConversationStateDto(
-                    root.path("topic").asText("Chat"),
-                    root.path("tone").asText("Friendly"),
-                    root.path("engagement").asText("BALANCED"),
-                    root.path("language").asText("ENGLISH"),
-                    root.path("dry").asBoolean(false)
+                    root.path("topic").asText(analysis != null ? analysis.primaryTopic() : "Chat"),
+                    root.path("tone").asText(analysis != null ? analysis.tone() : "Friendly"),
+                    root.path("engagement").asText(analysis != null && analysis.isDry() ? "DRY" : "BALANCED"),
+                    root.path("language").asText(analysis != null ? analysis.language() : "ENGLISH"),
+                    root.path("dry").asBoolean(analysis != null && analysis.isDry()),
+                    stage,
+                    hasQuestion,
+                    questionText
             );
 
             return Optional.of(new GenerationResult(items, state));

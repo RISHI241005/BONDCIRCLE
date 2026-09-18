@@ -577,8 +577,14 @@ function renderReplyCoachSuggestions(suggestions, convState) {
 
     const badge = $("replyCoachTopicBadge");
     if (badge) {
-        if (convState?.topic && convState.topic !== "Chat") {
+        if (convState?.hasUnansweredQuestion && convState?.unansweredQuestionText) {
+            badge.textContent = "Question: " + (convState.unansweredQuestionText.length > 28 ? convState.unansweredQuestionText.substring(0, 26) + "…" : convState.unansweredQuestionText);
+            badge.hidden = false;
+        } else if (convState?.topic && convState.topic !== "Chat") {
             badge.textContent = convState.topic;
+            badge.hidden = false;
+        } else if (convState?.stage && convState.stage !== "CASUAL") {
+            badge.textContent = convState.stage.replace(/_/g, ' ');
             badge.hidden = false;
         } else {
             badge.hidden = true;
@@ -601,9 +607,21 @@ function renderReplyCoachSuggestions(suggestions, convState) {
         card.className = "reply-coach-card";
         card.setAttribute("data-id", sug.id || "");
 
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "reply-coach-card-content";
+
         const textDiv = document.createElement("div");
         textDiv.className = "reply-coach-card-text";
         textDiv.textContent = `"${sug.text}"`;
+        contentDiv.appendChild(textDiv);
+
+        const tagText = sug.style || sug.tone || (sug.strategy ? sug.strategy.replace(/_/g, ' ').toLowerCase() : "");
+        if (tagText) {
+            const tagSpan = document.createElement("span");
+            tagSpan.className = "reply-coach-tag";
+            tagSpan.textContent = tagText;
+            contentDiv.appendChild(tagSpan);
+        }
 
         const actionsDiv = document.createElement("div");
         actionsDiv.className = "reply-coach-card-actions";
@@ -623,7 +641,7 @@ function renderReplyCoachSuggestions(suggestions, convState) {
         dismissBtn.addEventListener("click", () => handleDismissSuggestion(sug, card));
 
         actionsDiv.append(useBtn, dismissBtn);
-        card.append(textDiv, actionsDiv);
+        card.append(contentDiv, actionsDiv);
         list.appendChild(card);
     }
 }
@@ -638,6 +656,15 @@ function handleUseSuggestion(sug) {
     }
     closeReplyCoach();
     showToast("Reply inserted into composer — edit or send!", "info");
+
+    if (state.replyCoach) {
+        state.replyCoach.activeSuggestion = {
+            id: sug.id,
+            originalText: sug.text,
+            conversationId: state.activeId,
+            edited: false
+        };
+    }
 
     recordReplyFeedback(sug.id, state.activeId, "USED", sug.text);
 }
@@ -821,6 +848,13 @@ async function performSend(content, moderationOverride) {
     resizeComposer();
     sendTyping(false);
 
+    const activeSug = state.replyCoach?.activeSuggestion;
+    if (activeSug && activeSug.conversationId === state.activeId) {
+        const action = activeSug.edited ? "EDITED" : "SENT";
+        recordReplyFeedback(activeSug.id, state.activeId, action, content);
+        state.replyCoach.activeSuggestion = null;
+    }
+
     const payload = { conversationId: state.activeId, content, clientMessageId, type: "TEXT", moderationOverride };
     try {
         if (state.stompConnected) {
@@ -909,6 +943,13 @@ function resizeComposer() {
 function handleComposerInput() {
     clearModerationWarning();
     resizeComposer();
+    const activeSug = state.replyCoach?.activeSuggestion;
+    if (activeSug && activeSug.conversationId === state.activeId) {
+        const input = $("messageInput");
+        if (input && input.value !== activeSug.originalText) {
+            activeSug.edited = true;
+        }
+    }
     if (!state.activeId || !state.stompConnected) return;
     if (!state.sentTyping && $("messageInput").value.trim()) sendTyping(true);
     clearTimeout(state.typingTimer);

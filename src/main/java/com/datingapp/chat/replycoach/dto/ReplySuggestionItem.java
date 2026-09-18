@@ -8,6 +8,8 @@ public class ReplySuggestionItem {
     private String text;
     private String topic;
     private String tone;
+    private String strategy;
+    private String style;
 
     public ReplySuggestionItem() {
     }
@@ -22,6 +24,17 @@ public class ReplySuggestionItem {
         this.text = text;
         this.topic = topic;
         this.tone = tone;
+        this.strategy = "CONVERSATIONAL";
+        this.style = tone != null ? tone : "Casual";
+    }
+
+    public ReplySuggestionItem(String id, String text, String topic, String tone, String strategy, String style) {
+        this.id = id;
+        this.text = text;
+        this.topic = topic;
+        this.tone = tone;
+        this.strategy = strategy;
+        this.style = style;
     }
 
     public String getId() {
@@ -54,6 +67,22 @@ public class ReplySuggestionItem {
 
     public void setTone(String tone) {
         this.tone = tone;
+    }
+
+    public String getStrategy() {
+        return strategy;
+    }
+
+    public void setStrategy(String strategy) {
+        this.strategy = strategy;
+    }
+
+    public String getStyle() {
+        return style;
+    }
+
+    public void setStyle(String style) {
+        this.style = style;
     }
 
     @Override

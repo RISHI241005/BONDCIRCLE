@@ -5,6 +5,7 @@ import java.util.List;
 
 public class ReplySuggestionResponse {
 
+    private String generationId;
     private String conversationId;
     private List<ReplySuggestionItem> suggestions = new ArrayList<>();
     private ConversationStateDto conversationState;
@@ -13,9 +14,22 @@ public class ReplySuggestionResponse {
     }
 
     public ReplySuggestionResponse(String conversationId, List<ReplySuggestionItem> suggestions, ConversationStateDto conversationState) {
+        this("gen_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12), conversationId, suggestions, conversationState);
+    }
+
+    public ReplySuggestionResponse(String generationId, String conversationId, List<ReplySuggestionItem> suggestions, ConversationStateDto conversationState) {
+        this.generationId = generationId != null ? generationId : "gen_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         this.conversationId = conversationId;
         this.suggestions = suggestions != null ? suggestions : new ArrayList<>();
         this.conversationState = conversationState;
+    }
+
+    public String getGenerationId() {
+        return generationId;
+    }
+
+    public void setGenerationId(String generationId) {
+        this.generationId = generationId;
     }
 
     public String getConversationId() {

@@ -15,5 +15,7 @@ public enum FeedbackAction {
     /** User edited the suggestion before sending. */
     EDITED,
     /** User sent the (possibly edited) suggestion. */
-    SENT
+    SENT,
+    /** User explicitly liked/upvoted the suggestion. */
+    LIKED
 }

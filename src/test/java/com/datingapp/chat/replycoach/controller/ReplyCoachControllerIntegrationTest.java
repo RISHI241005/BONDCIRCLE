@@ -64,6 +64,9 @@ class ReplyCoachControllerIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private com.datingapp.chat.block.repository.BlockRepository blockRepository;
+
     private String userToken;
     private String conversationId;
     private Long user1Id;
@@ -147,6 +150,7 @@ class ReplyCoachControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.generationId").isNotEmpty())
                 .andExpect(jsonPath("$.data.conversationId").value(conversationId))
                 .andExpect(jsonPath("$.data.suggestions.length()").value(lessThanOrEqualTo(3)))
                 .andExpect(jsonPath("$.data.conversationState.topic").isNotEmpty());
@@ -168,6 +172,7 @@ class ReplyCoachControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.generationId").isNotEmpty())
                 .andExpect(jsonPath("$.data.suggestions.length()").value(lessThanOrEqualTo(3)));
     }
 
@@ -189,6 +194,56 @@ class ReplyCoachControllerIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.status").value("recorded"))
                 .andExpect(jsonPath("$.data.action").value("USED"));
+    }
+
+    @Test
+    @DisplayName("POST /api/ai/reply-suggestions/feedback supports LIKED action")
+    void testLikedFeedbackSuccess() throws Exception {
+        ReplyFeedbackRequest req = new ReplyFeedbackRequest(
+                "sug-liked-1",
+                conversationId,
+                FeedbackAction.LIKED,
+                "Hiking is my favorite way to recharge!"
+        );
+
+        mockMvc.perform(post("/api/ai/reply-suggestions/feedback")
+                        .header("Authorization", userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.action").value("LIKED"));
+    }
+
+    @Test
+    @DisplayName("POST /api/ai/reply-suggestions by non-participant returns 403 Forbidden")
+    void testUnauthorizedUserReturnsForbidden() throws Exception {
+        User outsider = new User("Outsider Eve", "999111999", "eve@test.com", "hash");
+        outsider = userRepository.save(outsider);
+        String outsiderToken = "Bearer " + jwtService.generateToken(outsider.getId(), List.of("ROLE_USER"));
+
+        ReplySuggestionRequest req = new ReplySuggestionRequest(conversationId, 3);
+        mockMvc.perform(post("/api/ai/reply-suggestions")
+                        .header("Authorization", outsiderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("POST /api/ai/reply-suggestions for blocked conversation returns 403 Forbidden")
+    void testBlockedConversationReturnsForbidden() throws Exception {
+        com.datingapp.chat.block.entity.Block block = new com.datingapp.chat.block.entity.Block(user1Id, user2Id);
+        blockRepository.save(block);
+
+        ReplySuggestionRequest req = new ReplySuggestionRequest(conversationId, 3);
+        mockMvc.perform(post("/api/ai/reply-suggestions")
+                        .header("Authorization", userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
