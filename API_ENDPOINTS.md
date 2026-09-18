@@ -40,22 +40,20 @@
 | PATCH | `/api/v1/chats/{conversationId}/messages/{messageId}` | Yes | `{ "content": String }` | - | `{ success: true, data: MessageResponse, message: "Message updated successfully", requestId: String }` | 400, 401, 403, 404, 409 | Edit sent message (original sender only) |
 | DELETE | `/api/v1/chats/{conversationId}/messages/{messageId}` | Yes | - | - | `{ success: true, data: MessageResponse, message: "Message deleted successfully", requestId: String }` | 401, 403, 404, 409 | Soft-delete message (original sender only) |
 
+### AI Reply Coach
+
+| METHOD | URL | AUTH | REQUEST BODY | RESPONSE | ERROR RESPONSES | PURPOSE |
+|---|---|---|---|---|---|---|
+| POST | `/api/ai/reply-suggestions` | Yes | `{ "conversationId": String, "limit": 3 }` | `{ success: true, data: { conversationId, suggestions: [ { id, text, topic, tone } ], conversationState: { topic, tone, engagement, language, dry } } }` | 400, 401, 403, 404 | Analyze two-sided conversation history and generate up to 3 natural, ready-to-send replies |
+| POST | `/api/ai/reply-suggestions/regenerate` | Yes | `{ "conversationId": String, "rejectedSuggestionIds": String[], "rejectedTexts": String[], "limit": 3 }` | `{ success: true, data: { conversationId, suggestions: [ { id, text, topic, tone } ], conversationState: { ... } } }` | 400, 401, 403, 404 | Generate fresh alternative reply suggestions while strictly avoiding previously rejected ideas |
+| POST | `/api/ai/reply-suggestions/feedback` | Yes | `{ "suggestionId": String, "conversationId": String, "action": "USED" \| "REJECTED" \| "COPIED" \| "EDITED" \| "SENT", "suggestionText": String }` | `{ success: true, data: { status: "recorded", suggestionId, action } }` | 400, 401, 403 | Record user interaction for style personalization |
+
 ### Interests and Ice Breakers
 
 | METHOD | URL | AUTH | REQUEST BODY | RESPONSE | ERROR RESPONSES | PURPOSE |
 |---|---|---|---|---|---|---|
 | PUT | `/api/v1/users/me/interests` | Yes | `{ "interests": ["Travel", "Music"] }` | `{ success: true, data: { interests: String[] } }` | 400, 401 | Replace the authenticated user's interests (maximum 10) |
-| GET | `/api/v1/chats/{conversationId}/ice-breakers` | Yes | - | `{ success: true, data: { conversationId, context, guidance, sharedInterests, priorTopics, circles, suggestions, source, language, mode, generatedLive } }` | 401, 403, 404 | Generate fresh AI replies from chat history and interests, with a deterministic fallback |
-
-Optional API parameters (the browser chooses these automatically):
-
-- `limit`: 1–20 replies.
-- `tone`: `ALL`, `CURIOUS`, `WARM`, `PLAYFUL`, or `THOUGHTFUL`.
-- `language`: `AUTO`, `ENGLISH`, or `HINGLISH`.
-- `mode`: `SUGGEST`, `WRITE_FOR_ME`, or `AUTOPILOT`.
-- `variant`: requests a fresh variation and controls fallback ordering.
-
-The browser requests four suggestions with automatic language and tone detection. `variant` is incremented by the Refresh button so the assistant explores a different conversational angle. `generatedLive` distinguishes provider-generated replies from the reliable offline Circle fallback.
+| GET | `/api/v1/chats/{conversationId}/ice-breakers` | Yes | - | `{ success: true, data: { conversationId, context, guidance, sharedInterests, priorTopics, circles, suggestions, source, language, mode, generatedLive } }` | 401, 403, 404 | Legacy icebreaker endpoint (deterministic/live) |
 
 ### Presence
 

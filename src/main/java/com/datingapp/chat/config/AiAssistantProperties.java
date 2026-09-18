@@ -97,7 +97,7 @@ public class AiAssistantProperties {
         if (provider == null || provider.isBlank()) return model;
         return switch (provider.toUpperCase(java.util.Locale.ROOT)) {
             case "GEMINI" -> "gemini-1.5-flash";
-            case "GROQ" -> "llama-3.3-70b-versatile";
+            case "GROQ" -> "openai/gpt-oss-20b";
             case "OPENAI" -> "gpt-4o-mini";
             default -> model;
         };

@@ -18,12 +18,14 @@ const state = {
     sentTyping: false,
     moderationChecking: false,
     pendingModeratedMessage: null,
-    coachLoadedFor: new Set(),
-    coachResponse: null,
-    coachVariant: 0,
-    coachMode: "SUGGEST",
-    coachLanguage: "AUTO",
-    coachTone: "ALL",
+    replyCoach: {
+        visible: false,
+        loading: false,
+        suggestions: [],
+        rejectedIds: [],
+        rejectedTexts: [],
+        activeConversationId: null
+    },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -335,9 +337,12 @@ async function openConversation(conversation, moveToChat = true) {
     if (moveToChat) workspace.classList.add("is-chat-open");
     renderConversations();
     $("messageList").textContent = "";
-    state.coachResponse = null;
-    state.coachVariant = 0;
-    closeIceBreakers();
+    closeReplyCoach();
+    if (state.replyCoach) {
+        state.replyCoach.suggestions = [];
+        state.replyCoach.rejectedIds = [];
+        state.replyCoach.rejectedTexts = [];
+    }
 
     try {
         const page = await api(`/chats/${encodeURIComponent(state.activeId)}/messages?limit=50`);
@@ -345,7 +350,6 @@ async function openConversation(conversation, moveToChat = true) {
         state.messages.set(state.activeId, messages);
         renderMessages();
         acknowledgeLatestIncoming(messages);
-        maybeSurfaceIceBreakers(messages);
     } catch (err) {
         showToast(err.message, "error");
     }
@@ -420,206 +424,234 @@ function upsertMessage(message) {
     if (conversationId === state.activeId) renderMessages();
 }
 
-function shouldSurfaceIceBreakers(messages) {
-    if (!messages.length) return true;
-    const lastMessageAt = new Date(messages[messages.length - 1]?.createdAt || 0).getTime();
-    if (lastMessageAt && Date.now() - lastMessageAt > 6 * 60 * 60 * 1000) return true;
-    if (messages.length < 3) return false;
-    return messages.slice(-4).filter((message) => String(message.content || "").trim().length <= 24).length >= 3;
+/* ==========================================================================
+   BOND CIRCLE — AI REPLY COACH
+   ========================================================================== */
+
+function toggleReplyCoach() {
+    if (state.replyCoach.visible) {
+        closeReplyCoach();
+    } else {
+        openReplyCoach();
+    }
 }
 
-function maybeSurfaceIceBreakers(messages) {
-    if (!shouldSurfaceIceBreakers(messages) || state.coachLoadedFor.has(state.activeId)) return;
-    state.coachLoadedFor.add(state.activeId);
-    loadIceBreakers(true);
+function closeReplyCoach() {
+    state.replyCoach.visible = false;
+    const panel = $("aiReplyCoachPanel");
+    if (panel) {
+        panel.hidden = true;
+    }
+    $("iceBreakerButton")?.setAttribute("aria-expanded", "false");
+    $("iceBreakerButton")?.classList.remove("is-active");
+    $("aiReplyComposerBtn")?.classList.remove("is-active");
 }
 
-async function loadIceBreakers(automatic = false) {
+async function openReplyCoach() {
     const conversationId = state.activeId;
-    if (!conversationId) return;
-    const panel = $("iceBreakerPanel");
-    const suggestions = $("iceBreakerSuggestions");
-    panel.hidden = false;
-    $("iceBreakerButton").setAttribute("aria-expanded", "true");
-    $("iceBreakerButton").classList.add("is-active");
-    suggestions.textContent = "";
-    const loading = document.createElement("p");
-    loading.className = "coach-loading";
-    loading.textContent = state.coachMode === "UNABLE_TO_TALK"
-        ? "Generating polite auto-replies for when you're busy…"
-        : "Analyzing the chat and crafting smart suggestions…";
-    suggestions.appendChild(loading);
-
-    updateAiToolbarStates();
-
-    try {
-        const params = new URLSearchParams({
-            limit: "4",
-            variant: String(state.coachVariant),
-            mode: state.coachMode || "SUGGEST",
-            language: state.coachLanguage || "AUTO",
-            tone: state.coachTone || "ALL",
-        });
-
-        const aiHeaders = {};
-        const storedKey = localStorage.getItem("bondcircle.ai_key");
-        const storedProvider = localStorage.getItem("bondcircle.ai_provider") || "gemini";
-        const storedModel = localStorage.getItem("bondcircle.ai_model");
-
-        if (storedKey) {
-            aiHeaders["X-AI-Key"] = storedKey;
-            aiHeaders["X-AI-Provider"] = storedProvider;
-            if (storedModel) aiHeaders["X-AI-Model"] = storedModel;
-        }
-
-        const response = await api(`/chats/${encodeURIComponent(conversationId)}/ice-breakers?${params}`, {
-            headers: aiHeaders
-        });
-        if (state.activeId !== conversationId) return;
-        renderIceBreakers(response);
-    } catch (err) {
-        closeIceBreakers();
-        if (!automatic) showToast(err.message, "error");
-    }
-}
-
-function renderIceBreakers(response) {
-    state.coachResponse = response;
-    const panel = $("iceBreakerPanel");
-    panel.classList.toggle("is-live", Boolean(response?.generatedLive));
-    panel.classList.toggle("is-fallback", !response?.generatedLive);
-
-    const modelBadge = $("aiModelBadge");
-    if (modelBadge) {
-        modelBadge.classList.remove("is-live-gemini", "is-live-openai", "is-live-groq", "is-rules");
-        const source = String(response?.source || "RULES").toUpperCase();
-        if (response?.generatedLive) {
-            if (source.includes("GEMINI")) {
-                modelBadge.textContent = "⚡ Gemini Live";
-                modelBadge.title = "Connected to Google Gemini live intelligence";
-                modelBadge.classList.add("is-live-gemini");
-            } else if (source.includes("GROQ")) {
-                modelBadge.textContent = "⚡ Groq Llama Live";
-                modelBadge.title = "Connected to Groq Llama 3.3 live intelligence";
-                modelBadge.classList.add("is-live-groq");
-            } else {
-                modelBadge.textContent = "⚡ ChatGPT Live";
-                modelBadge.title = "Connected to OpenAI live generative AI";
-                modelBadge.classList.add("is-live-openai");
-            }
-        } else {
-            const hasKey = Boolean(localStorage.getItem("bondcircle.ai_key"));
-            if (hasKey) {
-                modelBadge.textContent = "Smart Offline (Key Error)";
-                modelBadge.title = "Onboard rules engine active. Verify your key in AI Settings (⚙️).";
-            } else {
-                modelBadge.textContent = "Smart Offline Engine";
-                modelBadge.title = "Onboard smart engine active. Click ⚙️ to connect free Gemini or OpenAI key.";
-            }
-            modelBadge.classList.add("is-rules");
-        }
-    }
-
-    const guidanceEl = $("iceBreakerGuidance");
-    if (guidanceEl) {
-        guidanceEl.textContent = response?.generatedLive
-            ? (response?.guidance || "Live AI recommendations tailored to your conversation flow.")
-            : "Smart suggestions & advice tailored to your conversation.";
-    }
-
-    const moodEl = $("aiDetectedMood");
-    if (moodEl) {
-        moodEl.textContent = response?.detectedMood || "Casual & Natural";
-    }
-
-    const scenarioEl = $("aiScenarioSummary");
-    if (scenarioEl) {
-        scenarioEl.textContent = response?.conversationScenario || "Active conversation flow";
-    }
-
-    const verdictEl = $("aiReplyVerdict");
-    const urgencyEl = $("aiUrgencyBadge");
-    const reasonEl = $("aiDecisionReason");
-    const timingEl = $("aiReplyTiming");
-
-    const shouldReply = response?.shouldReply || "RECOMMENDED";
-    if (verdictEl) {
-        verdictEl.className = "ai-verdict-badge";
-        if (shouldReply === "RECOMMENDED") {
-            verdictEl.classList.add("verdict-recommended");
-            verdictEl.textContent = "🟢 Reply recommended";
-        } else if (shouldReply === "OPTIONAL") {
-            verdictEl.classList.add("verdict-optional");
-            verdictEl.textContent = "🟡 Optional / Take your time";
-        } else {
-            verdictEl.classList.add("verdict-no-rush");
-            verdictEl.textContent = "🔵 No rush / Wait for reply";
-        }
-    }
-
-    if (urgencyEl) {
-        urgencyEl.textContent = `Urgency: ${response?.urgency || "MEDIUM"}`;
-    }
-
-    if (reasonEl) {
-        reasonEl.textContent = response?.decisionReason || response?.guidance || "Here is what we advise based on the recent messages.";
-    }
-
-    if (timingEl) {
-        timingEl.textContent = response?.replyTiming || "Whenever you're ready";
-    }
-
-    updateAiToolbarStates();
-
-    const container = $("iceBreakerSuggestions");
-    container.textContent = "";
-    const suggestions = response?.suggestions || [];
-    if (!suggestions.length) {
-        const empty = document.createElement("p");
-        empty.className = "coach-loading";
-        empty.textContent = "No suggestion is available right now. Please tap Refresh or pick another situation.";
-        container.appendChild(empty);
+    if (!conversationId) {
+        showToast("Please select a conversation first", "info");
         return;
     }
 
-    for (const suggestion of suggestions) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "coach-suggestion";
-        button.title = suggestion.reason || "Use this suggestion";
-        const text = document.createElement("strong");
-        text.textContent = suggestion.text;
-        const hint = document.createElement("small");
-        const langBadge = suggestion.language === "HINGLISH" ? "🇮🇳 Hinglish" : "🇬🇧 English";
-        const toneBadge = suggestion.tone ? ` · ${suggestion.tone.toLowerCase()}` : "";
-        hint.innerHTML = `<span>${langBadge}${toneBadge}</span><span class="suggestion-cta">Use reply ↵</span>`;
-        button.append(text, hint);
-        button.addEventListener("click", () => {
-            $("messageInput").value = suggestion.text;
-            resizeComposer();
-            $("messageInput").focus();
-            showToast("Added to message input!", "info");
+    state.replyCoach.visible = true;
+    state.replyCoach.activeConversationId = conversationId;
+
+    const panel = $("aiReplyCoachPanel");
+    if (panel) {
+        panel.hidden = false;
+    }
+    $("iceBreakerButton")?.setAttribute("aria-expanded", "true");
+    $("iceBreakerButton")?.classList.add("is-active");
+    $("aiReplyComposerBtn")?.classList.add("is-active");
+
+    await fetchReplySuggestions();
+}
+
+async function fetchReplySuggestions() {
+    const conversationId = state.activeId;
+    if (!conversationId) return;
+
+    renderReplyCoachLoading("Listening to conversation and drafting replies…");
+
+    try {
+        const res = await api("/api/ai/reply-suggestions", {
+            method: "POST",
+            body: {
+                conversationId: conversationId,
+                limit: 3
+            }
         });
-        container.appendChild(button);
+        if (state.activeId !== conversationId) return;
+        const payload = res?.data || res;
+        state.replyCoach.suggestions = payload?.suggestions || [];
+        renderReplyCoachSuggestions(state.replyCoach.suggestions, payload?.conversationState);
+    } catch (err) {
+        renderReplyCoachError(err.message || "Couldn't generate suggestions right now.");
     }
 }
 
-function updateAiToolbarStates() {
-    $("modeUnableToTalk")?.classList.toggle("is-active", state.coachMode === "UNABLE_TO_TALK");
-    $("modeSuggest")?.classList.toggle("is-active", state.coachMode === "SUGGEST" && state.coachTone === "ALL");
-    $("modeWarm")?.classList.toggle("is-active", state.coachTone === "WARM");
-    $("modePlayful")?.classList.toggle("is-active", state.coachTone === "PLAYFUL");
-    $("modeThoughtful")?.classList.toggle("is-active", state.coachTone === "THOUGHTFUL");
+async function regenerateReplySuggestions() {
+    const conversationId = state.activeId;
+    if (!conversationId) return;
 
-    $("langAuto")?.classList.toggle("is-active", (state.coachLanguage || "AUTO") === "AUTO");
-    $("langEnglish")?.classList.toggle("is-active", state.coachLanguage === "ENGLISH");
-    $("langHinglish")?.classList.toggle("is-active", state.coachLanguage === "HINGLISH");
+    // Gather rejected suggestions
+    const currentSuggestions = state.replyCoach.suggestions || [];
+    for (const sug of currentSuggestions) {
+        if (sug.id && !state.replyCoach.rejectedIds.includes(sug.id)) {
+            state.replyCoach.rejectedIds.push(sug.id);
+        }
+        if (sug.text && !state.replyCoach.rejectedTexts.includes(sug.text)) {
+            state.replyCoach.rejectedTexts.push(sug.text);
+        }
+        recordReplyFeedback(sug.id, conversationId, "REJECTED", sug.text);
+    }
+
+    renderReplyCoachLoading("Exploring different angles…");
+
+    try {
+        const res = await api("/api/ai/reply-suggestions/regenerate", {
+            method: "POST",
+            body: {
+                conversationId: conversationId,
+                rejectedSuggestionIds: state.replyCoach.rejectedIds,
+                rejectedTexts: state.replyCoach.rejectedTexts,
+                limit: 3
+            }
+        });
+        if (state.activeId !== conversationId) return;
+        const payload = res?.data || res;
+        state.replyCoach.suggestions = payload?.suggestions || [];
+        renderReplyCoachSuggestions(state.replyCoach.suggestions, payload?.conversationState);
+    } catch (err) {
+        renderReplyCoachError(err.message || "Couldn't regenerate suggestions.");
+    }
 }
 
-function closeIceBreakers() {
-    $("iceBreakerPanel").hidden = true;
-    $("iceBreakerButton").setAttribute("aria-expanded", "false");
-    $("iceBreakerButton").classList.remove("is-active");
+function renderReplyCoachLoading(message) {
+    const list = $("replyCoachSuggestions");
+    if (!list) return;
+    list.innerHTML = `
+        <div class="reply-coach-loading">
+            <span class="reply-coach-loading-spinner" aria-hidden="true"></span>
+            <span>${escapeHtml(message)}</span>
+        </div>
+    `;
+}
+
+function renderReplyCoachError(errMsg) {
+    const list = $("replyCoachSuggestions");
+    if (!list) return;
+    list.innerHTML = `
+        <div class="reply-coach-empty">
+            <p>${escapeHtml(errMsg)}</p>
+            <button type="button" class="reply-coach-action-btn" id="replyCoachRetryBtn">Try Again</button>
+        </div>
+    `;
+    $("replyCoachRetryBtn")?.addEventListener("click", () => fetchReplySuggestions());
+}
+
+function renderReplyCoachSuggestions(suggestions, convState) {
+    const list = $("replyCoachSuggestions");
+    if (!list) return;
+    list.textContent = "";
+
+    const badge = $("replyCoachTopicBadge");
+    if (badge) {
+        if (convState?.topic && convState.topic !== "Chat") {
+            badge.textContent = convState.topic;
+            badge.hidden = false;
+        } else {
+            badge.hidden = true;
+        }
+    }
+
+    if (!suggestions || !suggestions.length) {
+        list.innerHTML = `
+            <div class="reply-coach-empty">
+                <p>No new suggestions available right now.</p>
+                <button type="button" class="reply-coach-action-btn" id="replyCoachFreshAngleBtn">Try Different Angle</button>
+            </div>
+        `;
+        $("replyCoachFreshAngleBtn")?.addEventListener("click", () => regenerateReplySuggestions());
+        return;
+    }
+
+    for (const sug of suggestions) {
+        const card = document.createElement("div");
+        card.className = "reply-coach-card";
+        card.setAttribute("data-id", sug.id || "");
+
+        const textDiv = document.createElement("div");
+        textDiv.className = "reply-coach-card-text";
+        textDiv.textContent = `"${sug.text}"`;
+
+        const actionsDiv = document.createElement("div");
+        actionsDiv.className = "reply-coach-card-actions";
+
+        const useBtn = document.createElement("button");
+        useBtn.type = "button";
+        useBtn.className = "reply-coach-use-btn";
+        useBtn.textContent = "Use";
+        useBtn.title = "Insert into message composer";
+        useBtn.addEventListener("click", () => handleUseSuggestion(sug));
+
+        const dismissBtn = document.createElement("button");
+        dismissBtn.type = "button";
+        dismissBtn.className = "reply-coach-dismiss-btn";
+        dismissBtn.textContent = "✕";
+        dismissBtn.title = "Not this reply";
+        dismissBtn.addEventListener("click", () => handleDismissSuggestion(sug, card));
+
+        actionsDiv.append(useBtn, dismissBtn);
+        card.append(textDiv, actionsDiv);
+        list.appendChild(card);
+    }
+}
+
+function handleUseSuggestion(sug) {
+    const input = $("messageInput");
+    if (input) {
+        input.value = sug.text;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        resizeComposer();
+        input.focus();
+    }
+    closeReplyCoach();
+    showToast("Reply inserted into composer — edit or send!", "info");
+
+    recordReplyFeedback(sug.id, state.activeId, "USED", sug.text);
+}
+
+function handleDismissSuggestion(sug, cardEl) {
+    if (cardEl) {
+        cardEl.style.opacity = "0.25";
+        cardEl.style.pointerEvents = "none";
+    }
+    if (sug.id && !state.replyCoach.rejectedIds.includes(sug.id)) {
+        state.replyCoach.rejectedIds.push(sug.id);
+    }
+    if (sug.text && !state.replyCoach.rejectedTexts.includes(sug.text)) {
+        state.replyCoach.rejectedTexts.push(sug.text);
+    }
+    recordReplyFeedback(sug.id, state.activeId, "REJECTED", sug.text);
+}
+
+async function recordReplyFeedback(suggestionId, conversationId, action, suggestionText) {
+    if (!suggestionId || !conversationId) return;
+    try {
+        await api("/api/ai/reply-suggestions/feedback", {
+            method: "POST",
+            body: {
+                suggestionId: String(suggestionId),
+                conversationId: String(conversationId),
+                action: action,
+                suggestionText: suggestionText || ""
+            }
+        });
+    } catch {
+        // Feedback recording is best-effort background
+    }
 }
 
 function openInterests() {
@@ -1070,7 +1102,7 @@ function handleGoBack() {
         $("activeConversation").hidden = true;
         workspace?.classList.remove("is-chat-open");
         renderConversations();
-        closeIceBreakers();
+        closeReplyCoach();
         closeChatSearch();
         closeChatDropdown();
     }
@@ -1263,10 +1295,7 @@ function handleVoiceNote() {
     }
 }
 
-function toggleMinimizeIceBreakers() {
-    const panel = $("iceBreakerPanel");
-    if (panel) panel.classList.toggle("is-minimized");
-}
+
 
 $("loginTab").addEventListener("click", () => switchAuthTab("login"));
 $("registerTab").addEventListener("click", () => switchAuthTab("register"));
@@ -1360,63 +1389,10 @@ $("moderationModal").addEventListener("click", (event) => {
     if (event.target === $("moderationModal")) closeModerationWarning();
 });
 
-$("iceBreakerButton").addEventListener("click", () => {
-    if ($("iceBreakerPanel").hidden) loadIceBreakers(false);
-    else closeIceBreakers();
-});
-$("refreshIceBreakers").addEventListener("click", () => {
-    state.coachVariant += 1;
-    loadIceBreakers(false);
-});
-$("closeIceBreakers").addEventListener("click", closeIceBreakers);
-$("minimizeIceBreakers")?.addEventListener("click", toggleMinimizeIceBreakers);
-
-$("modeUnableToTalk")?.addEventListener("click", () => {
-    state.coachMode = "UNABLE_TO_TALK";
-    state.coachTone = "ALL";
-    state.coachVariant = 0;
-    loadIceBreakers(false);
-});
-$("modeSuggest")?.addEventListener("click", () => {
-    state.coachMode = "SUGGEST";
-    state.coachTone = "ALL";
-    state.coachVariant = 0;
-    loadIceBreakers(false);
-});
-$("modeWarm")?.addEventListener("click", () => {
-    state.coachMode = "SUGGEST";
-    state.coachTone = "WARM";
-    state.coachVariant = 0;
-    loadIceBreakers(false);
-});
-$("modePlayful")?.addEventListener("click", () => {
-    state.coachMode = "SUGGEST";
-    state.coachTone = "PLAYFUL";
-    state.coachVariant = 0;
-    loadIceBreakers(false);
-});
-$("modeThoughtful")?.addEventListener("click", () => {
-    state.coachMode = "SUGGEST";
-    state.coachTone = "THOUGHTFUL";
-    state.coachVariant = 0;
-    loadIceBreakers(false);
-});
-
-$("langAuto")?.addEventListener("click", () => {
-    state.coachLanguage = "AUTO";
-    state.coachVariant = 0;
-    loadIceBreakers(false);
-});
-$("langEnglish")?.addEventListener("click", () => {
-    state.coachLanguage = "ENGLISH";
-    state.coachVariant = 0;
-    loadIceBreakers(false);
-});
-$("langHinglish")?.addEventListener("click", () => {
-    state.coachLanguage = "HINGLISH";
-    state.coachVariant = 0;
-    loadIceBreakers(false);
-});
+$("iceBreakerButton")?.addEventListener("click", toggleReplyCoach);
+$("aiReplyComposerBtn")?.addEventListener("click", toggleReplyCoach);
+$("replyCoachRegenBtn")?.addEventListener("click", regenerateReplySuggestions);
+$("replyCoachCloseBtn")?.addEventListener("click", closeReplyCoach);
 
 $("interestsButton").addEventListener("click", openInterests);
 $("interestsClose").addEventListener("click", closeInterests);
@@ -1530,8 +1506,8 @@ function saveAiSettings() {
     }
 
     closeAiSettingsModal();
-    if (state.activeId && !$("iceBreakerPanel").hidden) {
-        loadIceBreakers(false);
+    if (state.activeId && state.replyCoach?.visible) {
+        fetchReplySuggestions();
     }
 }
 
@@ -1546,8 +1522,8 @@ function disconnectAiSettings() {
 
     showToast("Disconnected key. Smart offline engine restored.", "info");
     closeAiSettingsModal();
-    if (state.activeId && !$("iceBreakerPanel").hidden) {
-        loadIceBreakers(false);
+    if (state.activeId && state.replyCoach?.visible) {
+        fetchReplySuggestions();
     }
 }
 

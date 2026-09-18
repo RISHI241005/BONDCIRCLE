@@ -135,8 +135,8 @@
                             <button id="videoCallBtn" class="icon-button" type="button" title="Video call" aria-label="Video call">
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                             </button>
-                            <button id="iceBreakerButton" class="coach-button" type="button" aria-expanded="false" aria-controls="iceBreakerPanel" title="Toggle AI Copilot">
-                                <span class="copilot-sparkle" aria-hidden="true">✦</span> AI Copilot
+                            <button id="iceBreakerButton" class="coach-button" type="button" aria-expanded="false" aria-controls="aiReplyCoachPanel" title="✨ AI Reply Coach">
+                                <span class="copilot-sparkle" aria-hidden="true">✨</span> AI Reply
                             </button>
                             <div class="chat-menu-wrapper">
                                 <button id="chatMenuBtn" class="icon-button" type="button" title="More options" aria-label="More options">
@@ -171,57 +171,22 @@
                     <!-- Message Stream -->
                     <div id="messageList" class="message-list" aria-live="polite" aria-label="Messages"></div>
 
-                    <!-- Sleek Collapsible AI Copilot Panel -->
-                    <section id="iceBreakerPanel" class="coach-panel" aria-label="AI Conversation Assistant" hidden>
-                        <div class="coach-heading">
-                            <div class="coach-title-area">
-                                <div class="coach-title-row">
-                                    <strong>AI Chat Copilot</strong>
-                                    <span id="aiModelBadge" class="ai-badge">AI Assistant</span>
-                                    <span id="aiReplyVerdict" class="ai-verdict-badge">Analyzing…</span>
-                                </div>
+                    <!-- BOND CIRCLE — AI REPLY COACH PANEL -->
+                    <section id="aiReplyCoachPanel" class="reply-coach-panel" aria-label="AI Reply Coach" hidden>
+                        <div class="reply-coach-header">
+                            <div class="reply-coach-title-wrap">
+                                <span class="reply-coach-sparkle" aria-hidden="true">✨</span>
+                                <strong class="reply-coach-title">Suggested Replies</strong>
+                                <span id="replyCoachTopicBadge" class="reply-coach-badge" hidden></span>
                             </div>
-                            <div class="coach-actions">
-                                <button id="aiSettingsButton" class="coach-action-btn" type="button" title="AI Brain Settings (Connect Gemini / OpenAI / Groq)" aria-label="AI Brain Settings">⚙️</button>
-                                <button id="minimizeIceBreakers" class="coach-action-btn" type="button" title="Minimize/Expand suggestions">⌄</button>
-                                <button id="refreshIceBreakers" class="coach-action-btn coach-refresh" type="button" title="Get different suggestions" aria-label="Get different suggestions">↻</button>
-                                <button id="closeIceBreakers" class="coach-action-btn" type="button" title="Close suggestions" aria-label="Close suggestions">✕</button>
+                            <div class="reply-coach-actions">
+                                <button id="replyCoachRegenBtn" class="reply-coach-action-btn reply-coach-regen" type="button" title="Get different suggestions">
+                                    <span class="regen-icon" aria-hidden="true">🔄</span> More suggestions
+                                </button>
+                                <button id="replyCoachCloseBtn" class="reply-coach-action-btn reply-coach-close" type="button" title="Close suggestions" aria-label="Close">✕</button>
                             </div>
                         </div>
-
-                        <!-- Micro Advisor Intelligence Strip -->
-                        <div id="aiAdviceCard" class="ai-advice-card">
-                            <div class="ai-intelligence-meta">
-                                <span class="ai-meta-label">Mood:</span>
-                                <span id="aiDetectedMood" class="ai-mood-badge">Analyzing…</span>
-                                <span class="ai-meta-label">Scenario:</span>
-                                <span id="aiScenarioSummary" class="ai-scenario-badge">Reading context…</span>
-                                <span id="aiUrgencyBadge" class="ai-urgency-badge"></span>
-                                <span id="aiTimingWrapper" class="ai-timing-row">⏱️ <span id="aiReplyTiming" class="ai-timing-value">Whenever ready</span></span>
-                            </div>
-                            <p id="aiDecisionReason" class="ai-advice-reason">Reading chat context…</p>
-                        </div>
-
-                        <!-- Situation / Mode & Language Toolbars -->
-                        <div class="ai-toolbars-group">
-                            <div class="ai-modes-bar" role="toolbar" aria-label="Conversation situation">
-                                <span class="ai-modes-label">Vibe:</span>
-                                <button id="modeUnableToTalk" class="ai-mode-pill" type="button" data-mode="UNABLE_TO_TALK" title="Polite busy auto-replies">🏃 Busy</button>
-                                <button id="modeSuggest" class="ai-mode-pill is-active" type="button" data-mode="SUGGEST" title="Smart mood context match">💬 Smart reply</button>
-                                <button id="modeWarm" class="ai-mode-pill" type="button" data-tone="WARM" title="Warm & flirty replies">❤️ Warm</button>
-                                <button id="modePlayful" class="ai-mode-pill" type="button" data-tone="PLAYFUL" title="Teasing & playful replies">😄 Playful</button>
-                                <button id="modeThoughtful" class="ai-mode-pill" type="button" data-tone="THOUGHTFUL" title="Deep & thoughtful replies">💡 Deep</button>
-                            </div>
-
-                            <div class="ai-lang-bar">
-                                <span class="ai-modes-label">Language:</span>
-                                <button id="langAuto" class="ai-lang-pill is-active" type="button" data-lang="AUTO">✨ Auto</button>
-                                <button id="langEnglish" class="ai-lang-pill" type="button" data-lang="ENGLISH">🇬🇧 English</button>
-                                <button id="langHinglish" class="ai-lang-pill" type="button" data-lang="HINGLISH">🇮🇳 Hinglish</button>
-                            </div>
-                        </div>
-
-                        <div id="iceBreakerSuggestions" class="coach-suggestions"></div>
+                        <div id="replyCoachSuggestions" class="reply-coach-list"></div>
                     </section>
 
                     <div id="typingIndicator" class="typing" hidden><span></span><span></span><span></span><em>typing…</em></div>
@@ -236,6 +201,11 @@
                         <!-- Attachment Picker Button -->
                         <button id="attachButton" class="icon-button composer-tool-btn" type="button" title="Attach file or media" aria-label="Attach file">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        </button>
+
+                        <!-- ✨ AI Reply Coach Button in Composer -->
+                        <button id="aiReplyComposerBtn" class="icon-button composer-tool-btn ai-reply-btn" type="button" title="✨ AI Reply (Get 3 suggestions)" aria-label="AI Reply Suggestions">
+                            <span class="ai-reply-icon" aria-hidden="true">✨</span>
                         </button>
 
                         <div class="composer-input-wrapper">

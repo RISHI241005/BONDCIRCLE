@@ -256,3 +256,197 @@ class ChatWebSocketClient {
    - Send STOMP frame to /app/chat.send
    - On offline/network retry: Re-send with same clientMessageId (backend prevents duplicates)
 ```
+
+---
+
+## 5. BondCircle AI Reply Coach Integration
+
+The AI Reply Coach provides an intelligent companion beside the user in chat. It suggests up to 3 context-aware replies that the user can tap to populate into the text composer without auto-sending.
+
+### 5.1 Dart Models (`reply_coach_models.dart`)
+
+```dart
+class ReplySuggestionItem {
+  final String id;
+  final String text;
+  final String? topic;
+  final String? tone;
+
+  ReplySuggestionItem({
+    required this.id,
+    required this.text,
+    this.topic,
+    this.tone,
+  });
+
+  factory ReplySuggestionItem.fromJson(Map<String, dynamic> json) {
+    return ReplySuggestionItem(
+      id: json['id'] as String? ?? '',
+      text: json['text'] as String? ?? '',
+      topic: json['topic'] as String?,
+      tone: json['tone'] as String?,
+    );
+  }
+}
+
+class ConversationStateInfo {
+  final String topic;
+  final String tone;
+  final String engagement;
+  final String language;
+  final bool dry;
+
+  ConversationStateInfo({
+    required this.topic,
+    required this.tone,
+    required this.engagement,
+    required this.language,
+    required this.dry,
+  });
+
+  factory ConversationStateInfo.fromJson(Map<String, dynamic> json) {
+    return ConversationStateInfo(
+      topic: json['topic'] as String? ?? 'General',
+      tone: json['tone'] as String? ?? 'Friendly',
+      engagement: json['engagement'] as String? ?? 'BALANCED',
+      language: json['language'] as String? ?? 'ENGLISH',
+      dry: json['dry'] as bool? ?? false,
+    );
+  }
+}
+
+class ReplySuggestionResponse {
+  final String conversationId;
+  final List<ReplySuggestionItem> suggestions;
+  final ConversationStateInfo? conversationState;
+
+  ReplySuggestionResponse({
+    required this.conversationId,
+    required this.suggestions,
+    this.conversationState,
+  });
+
+  factory ReplySuggestionResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] != null ? json['data'] as Map<String, dynamic> : json;
+    final list = (data['suggestions'] as List<dynamic>? ?? [])
+        .map((e) => ReplySuggestionItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return ReplySuggestionResponse(
+      conversationId: data['conversationId'] as String? ?? '',
+      suggestions: list,
+      conversationState: data['conversationState'] != null
+          ? ConversationStateInfo.fromJson(data['conversationState'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+enum ReplyFeedbackAction { SHOWN, USED, REJECTED, COPIED, EDITED, SENT }
+```
+
+### 5.2 API Service (`reply_coach_service.dart`)
+
+```dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class ReplyCoachService {
+  final String baseUrl;
+  final String Function() getBearerToken;
+
+  ReplyCoachService({required this.baseUrl, required this.getBearerToken});
+
+  Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ${getBearerToken()}',
+  };
+
+  /// Request up to 3 AI reply suggestions for current chat
+  Future<ReplySuggestionResponse> getReplySuggestions({
+    required String conversationId,
+    int limit = 3,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/ai/reply-suggestions'),
+      headers: _headers,
+      body: jsonEncode({
+        'conversationId': conversationId,
+        'limit': limit,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return ReplySuggestionResponse.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to generate suggestions: ${response.statusCode}');
+  }
+
+  /// Request up to 3 fresh suggestions avoiding rejected ideas
+  Future<ReplySuggestionResponse> regenerateSuggestions({
+    required String conversationId,
+    required List<String> rejectedSuggestionIds,
+    List<String> rejectedTexts = const [],
+    int limit = 3,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/ai/reply-suggestions/regenerate'),
+      headers: _headers,
+      body: jsonEncode({
+        'conversationId': conversationId,
+        'rejectedSuggestionIds': rejectedSuggestionIds,
+        'rejectedTexts': rejectedTexts,
+        'limit': limit,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return ReplySuggestionResponse.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to regenerate suggestions: ${response.statusCode}');
+  }
+
+  /// Track user feedback (USED, REJECTED, etc.) for personalized learning
+  Future<void> sendFeedback({
+    required String suggestionId,
+    required String conversationId,
+    required ReplyFeedbackAction action,
+    String? suggestionText,
+  }) async {
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/api/ai/reply-suggestions/feedback'),
+        headers: _headers,
+        body: jsonEncode({
+          'suggestionId': suggestionId,
+          'conversationId': conversationId,
+          'action': action.name,
+          'suggestionText': suggestionText ?? '',
+        }),
+      );
+    } catch (_) {
+      // Best-effort background tracking
+    }
+  }
+}
+```
+
+### 5.3 Flutter UI Integration Flow
+
+```
+Chat Screen
+    ↓
+Tap "✨ AI Reply" button beside composer
+    ↓
+Bottom Sheet or Inline Drawer appears with 3 suggestion cards
+    ↓
+User taps a suggestion card:
+    → Populates: textEditingController.text = suggestion.text
+    → Dismisses suggestions panel
+    → Records: sendFeedback(action: ReplyFeedbackAction.USED)
+    → Focuses text field: focusNode.requestFocus()
+    → DOES NOT auto-send: User can edit, add text, or send normally
+    ↓
+If user taps "🔄 More suggestions":
+    → Gathers current suggestion IDs into rejectedList
+    → Calls: regenerateSuggestions(rejectedSuggestionIds: rejectedList)
+    → Animates 3 new suggestions into view
+```
+

@@ -92,6 +92,14 @@ public class User {
         this.passwordHash = passwordHash;
     }
 
+    public String getInterests() {
+        return interests;
+    }
+
+    public void setInterests(String interests) {
+        this.interests = interests;
+    }
+
     public List<String> getInterestList() {
         if (interests == null || interests.isBlank()) {
             return Collections.emptyList();

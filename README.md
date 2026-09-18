@@ -14,8 +14,7 @@ A phone-number-first chat website built with **Java 21**, **Spring Boot 3.3.3**,
 - **Delivery & Read Receipts**: Realtime status transitions (`SENT` → `DELIVERED` → `READ`) with watermarked unread counters.
 - **Ephemeral Typing Indicators**: Broadcasts partner typing state without database overhead (`/app/chat.typing` → `/user/queue/typing`).
 - **Multi-Device Presence Tracking**: Tracks simultaneous device sessions per user (e.g. Android phone + iOS tablet) and maintains accurate `lastSeenAt` timestamps.
-- **English & Hinglish Language Warning**: Drafts with common abusive terms, pronunciation-based spellings, typos, leetspeak, repeated letters, or separated-letter obfuscation open an accessible pre-send warning; REST and WebSocket sends require an explicit override before flagged text is accepted.
-- **Simple English/Hinglish AI Suggestions**: Generates four natural, context-aware replies from recent messages and both profiles' interests. Tap one to use it or refresh for different ideas; language and tone are inferred automatically, with a resilient offline fallback.
+- **BOND CIRCLE — AI Reply Coach**: Analyzes recent two-sided conversation context and suggests up to 3 natural, ready-to-send replies. Tap to insert into composer (never auto-sends), dismiss unwanted replies, or tap "More suggestions" for fresh angles. Features English/Hinglish language awareness, dry conversation re-openers, and feedback learning.
 - **Content Moderation & Safety**: Bi-directional blocking (`BlockService`) and conversation/message reporting (`ReportService`).
 - **Database Migrations (Flyway)**: Versioned schema evolution with zero reliance on `hibernate.ddl-auto=create`.
 - **OpenAPI 3.0 / Swagger UI**: Interactive API documentation at `/swagger-ui.html`.
