@@ -17,11 +17,13 @@ import com.datingapp.chat.replycoach.entity.AiReplyFeedback;
 import com.datingapp.chat.replycoach.entity.FeedbackAction;
 import com.datingapp.chat.replycoach.provider.AIReplyProvider;
 import com.datingapp.chat.replycoach.repository.AiReplyFeedbackRepository;
+import com.datingapp.chat.replycoach.service.AiReplyFeedbackRecorder;
 import com.datingapp.chat.replycoach.service.ReplyCoachService;
 import com.datingapp.chat.security.User;
 import com.datingapp.chat.security.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +61,27 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
     private final BlockRepository blockRepository;
     private final AiReplyFeedbackRepository feedbackRepository;
     private final AIReplyProvider aiReplyProvider;
+    private final AiReplyFeedbackRecorder feedbackRecorder;
+
+    @Autowired
+    public ReplyCoachServiceImpl(
+            ConversationRepository conversationRepository,
+            ConversationParticipantRepository participantRepository,
+            MessageRepository messageRepository,
+            UserRepository userRepository,
+            BlockRepository blockRepository,
+            AiReplyFeedbackRepository feedbackRepository,
+            AIReplyProvider aiReplyProvider,
+            AiReplyFeedbackRecorder feedbackRecorder) {
+        this.conversationRepository = conversationRepository;
+        this.participantRepository = participantRepository;
+        this.messageRepository = messageRepository;
+        this.userRepository = userRepository;
+        this.blockRepository = blockRepository;
+        this.feedbackRepository = feedbackRepository;
+        this.aiReplyProvider = aiReplyProvider;
+        this.feedbackRecorder = feedbackRecorder != null ? feedbackRecorder : new AiReplyFeedbackRecorder(feedbackRepository);
+    }
 
     public ReplyCoachServiceImpl(
             ConversationRepository conversationRepository,
@@ -68,13 +91,7 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
             BlockRepository blockRepository,
             AiReplyFeedbackRepository feedbackRepository,
             AIReplyProvider aiReplyProvider) {
-        this.conversationRepository = conversationRepository;
-        this.participantRepository = participantRepository;
-        this.messageRepository = messageRepository;
-        this.userRepository = userRepository;
-        this.blockRepository = blockRepository;
-        this.feedbackRepository = feedbackRepository;
-        this.aiReplyProvider = aiReplyProvider;
+        this(conversationRepository, participantRepository, messageRepository, userRepository, blockRepository, feedbackRepository, aiReplyProvider, new AiReplyFeedbackRecorder(feedbackRepository));
     }
 
     @Override
@@ -95,7 +112,6 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
     }
 
     @Override
-    @Transactional
     public void recordFeedback(Long userId, ReplyFeedbackRequest request) {
         if (request == null || request.getConversationId() == null || request.getSuggestionId() == null) {
             return;
@@ -106,14 +122,13 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
             throw new ForbiddenException("You are not a participant in this conversation", ErrorCode.CHAT_ACCESS_DENIED);
         }
 
-        AiReplyFeedback feedback = new AiReplyFeedback(
+        feedbackRecorder.recordSingle(
                 userId,
                 request.getConversationId(),
                 request.getSuggestionId(),
-                request.getSuggestionText() != null ? request.getSuggestionText() : "",
-                request.getAction() != null ? request.getAction() : FeedbackAction.SHOWN
+                request.getSuggestionText(),
+                request.getAction()
         );
-        feedbackRepository.save(feedback);
         log.debug("Recorded AI Reply Coach feedback: user={}, action={}, suggestionId={}",
                 userId, request.getAction(), request.getSuggestionId());
     }
@@ -240,9 +255,11 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
     }
 
     private void recordShownFeedbackAsync(Long userId, String conversationId, List<ReplySuggestionItem> suggestions) {
-        try {
-            for (ReplySuggestionItem item : suggestions) {
-                feedbackRepository.save(new AiReplyFeedback(
+        if (suggestions == null || suggestions.isEmpty()) return;
+        List<AiReplyFeedback> records = new ArrayList<>();
+        for (ReplySuggestionItem item : suggestions) {
+            if (item != null && item.getId() != null && item.getText() != null) {
+                records.add(new AiReplyFeedback(
                         userId,
                         conversationId,
                         item.getId(),
@@ -250,9 +267,8 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
                         FeedbackAction.SHOWN
                 ));
             }
-        } catch (Exception ex) {
-            log.warn("Failed to record SHOWN feedback for suggestions: {}", ex.getMessage());
         }
+        feedbackRecorder.recordBatch(records);
     }
 
     private List<ReplySuggestionItem> filterValidSuggestions(
@@ -468,6 +484,10 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
         }
 
         // Filter against rejected suggestions
-        return filterValidSuggestions(candidates, rejectedTexts, limit);
+        List<ReplySuggestionItem> filtered = filterValidSuggestions(candidates, rejectedTexts, limit);
+        if (filtered.isEmpty()) {
+            return candidates.subList(0, Math.min(limit, candidates.size()));
+        }
+        return filtered;
     }
 }

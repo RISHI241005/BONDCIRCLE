@@ -158,7 +158,7 @@ class ReplyCoachServiceTest {
         assertThat(response.getConversationState().getTopic()).isEqualTo("Weekend Plans");
 
         // Verify SHOWN feedback is recorded
-        verify(feedbackRepository, atLeastOnce()).save(any(AiReplyFeedback.class));
+        verify(feedbackRepository, atLeastOnce()).saveAll(anyList());
     }
 
     @Test
