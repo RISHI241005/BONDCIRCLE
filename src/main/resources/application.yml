@@ -54,10 +54,10 @@ chat:
     quiet-after-hours: ${ICEBREAKER_QUIET_AFTER_HOURS:6}
   ai-assistant:
     enabled: ${AI_ASSISTANT_ENABLED:true}
-    api-key: ${OPENAI_API_KEY:${AI_ASSISTANT_API_KEY:${AI_GATEWAY_API_KEY:${VERCEL_OIDC_TOKEN:}}}}
-    base-url: ${AI_ASSISTANT_BASE_URL:${OPENAI_BASE_URL:https://api.openai.com/v1}}
-    model: ${AI_ASSISTANT_MODEL:${OPENAI_MODEL:gpt-4o-mini}}
-    timeout-seconds: ${AI_ASSISTANT_TIMEOUT_SECONDS:25}
+    api-key: ${AI_ASSISTANT_API_KEY:${GROQ_API_KEY:${OPENAI_API_KEY:${AI_GATEWAY_API_KEY:${VERCEL_OIDC_TOKEN:}}}}}
+    base-url: ${AI_ASSISTANT_BASE_URL:https://api.groq.com/openai/v1}
+    model: ${AI_ASSISTANT_MODEL:llama-3.3-70b-versatile}
+    timeout-seconds: ${AI_ASSISTANT_TIMEOUT_SECONDS:30}
     history-messages: ${AI_ASSISTANT_HISTORY_MESSAGES:40}
     max-suggestions: ${AI_ASSISTANT_MAX_SUGGESTIONS:12}
-    max-output-tokens: ${AI_ASSISTANT_MAX_OUTPUT_TOKENS:1400}
+    max-output-tokens: ${AI_ASSISTANT_MAX_OUTPUT_TOKENS:1800}
