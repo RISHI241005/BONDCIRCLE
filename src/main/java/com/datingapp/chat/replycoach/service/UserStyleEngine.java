@@ -59,7 +59,13 @@ public class UserStyleEngine {
 
         // 1. Inspect recent USED and LIKED suggestions from feedback repository
         try {
-            List<String> usedTexts = feedbackRepository.findRecentUsedTexts(userId, PageRequest.of(0, 10));
+            List<String> usedTexts = feedbackRepository.findRecentPositiveTexts(userId, PageRequest.of(0, 20));
+            if (usedTexts == null || usedTexts.isEmpty()) {
+                // Compatibility with existing repositories/mocks while the
+                // broader positive-action model rolls out.
+                usedTexts = feedbackRepository.findRecentUsedTexts(userId, PageRequest.of(0, 10));
+            }
+            if (usedTexts == null) usedTexts = List.of();
             if (!usedTexts.isEmpty()) {
                 avgLen = usedTexts.stream().mapToInt(String::length).average().orElse(35);
                 if (avgLen < 30) {
@@ -110,7 +116,11 @@ public class UserStyleEngine {
                     }
                     if (lower.contains("tell me more") || lower.contains("how are you doing today") || lower.contains("what else")) {
                         negativeDirectives.append("Avoid generic robotic follow-up questions. ");
+                        rejectedStrategies.add(ReplyStrategy.ASK_FOLLOWUP);
                         break;
+                    }
+                    if (lower.contains("wow") || lower.contains("absolutely") || lower.contains("amazing")) {
+                        rejectedStrategies.add(ReplyStrategy.PLAYFUL);
                     }
                 }
             }
@@ -135,9 +145,20 @@ public class UserStyleEngine {
                     .toList();
             medianLen = sortedLens.get(sortedLens.size() / 2);
 
-            boolean anyEmoji = userMessages.stream()
-                    .anyMatch(m -> m.content() != null && m.content().codePoints().anyMatch(Character::isEmoji));
-            if (anyEmoji && emojiUsage == EmojiUsage.OCCASIONAL) {
+            long messagesWithEmoji = userMessages.stream()
+                    .filter(m -> m.content() != null && m.content().codePoints().anyMatch(Character::isEmoji))
+                    .count();
+            double emojiRatio = (double) messagesWithEmoji / userMessages.size();
+            if (emojiRatio == 0.0) {
+                if (emojiUsage != EmojiUsage.FREQUENT) {
+                    emojiUsage = EmojiUsage.NONE;
+                }
+            } else if (emojiRatio >= 0.35) {
+                emojiUsage = EmojiUsage.FREQUENT;
+            } else {
+                emojiUsage = EmojiUsage.OCCASIONAL;
+            }
+            if (messagesWithEmoji > 0 && emojiUsage == EmojiUsage.OCCASIONAL) {
                 directives.append("Use emojis occasionally like the user does. ");
             }
 

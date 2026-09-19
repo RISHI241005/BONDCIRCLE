@@ -18,6 +18,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -111,17 +113,11 @@ public class AIReplyProvider {
                     Map.of("role", "user", "content", userPrompt)
             ));
             body.put("response_format", Map.of("type", "json_object"));
-            body.put("max_tokens", 800);
+            body.put("max_tokens", Math.max(256, properties.getMaxOutputTokens()));
             body.put("temperature", 0.7);
 
             String uri = baseUrl.endsWith("/chat/completions") ? "" : "/chat/completions";
-            JsonNode response = defaultRestClient.post()
-                    .uri(uri)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + apiKey)
-                    .body(body)
-                    .retrieve()
-                    .body(JsonNode.class);
+            JsonNode response = postWithRetry(uri, apiKey, body);
 
             return parseAiResponse(response, targetCount, env != null ? ConversationAnalysis.fromEnvironment(env) : null);
         } catch (Exception ex) {
@@ -164,17 +160,11 @@ public class AIReplyProvider {
                     Map.of("role", "user", "content", userPrompt)
             ));
             body.put("response_format", Map.of("type", "json_object"));
-            body.put("max_tokens", 800);
+            body.put("max_tokens", Math.max(256, properties.getMaxOutputTokens()));
             body.put("temperature", 0.7);
 
             String uri = baseUrl.endsWith("/chat/completions") ? "" : "/chat/completions";
-            JsonNode response = defaultRestClient.post()
-                    .uri(uri)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + apiKey)
-                    .body(body)
-                    .retrieve()
-                    .body(JsonNode.class);
+            JsonNode response = postWithRetry(uri, apiKey, body);
 
             return parseAiResponse(response, targetCount, analysis);
         } catch (Exception ex) {
@@ -220,17 +210,11 @@ public class AIReplyProvider {
                     Map.of("role", "user", "content", userPrompt)
             ));
             body.put("response_format", Map.of("type", "json_object"));
-            body.put("max_tokens", 800);
+            body.put("max_tokens", Math.max(256, properties.getMaxOutputTokens()));
             body.put("temperature", 0.7);
 
             String uri = baseUrl.endsWith("/chat/completions") ? "" : "/chat/completions";
-            JsonNode response = defaultRestClient.post()
-                    .uri(uri)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + apiKey)
-                    .body(body)
-                    .retrieve()
-                    .body(JsonNode.class);
+            JsonNode response = postWithRetry(uri, apiKey, body);
 
             return parseAiResponse(response, targetCount, null);
         } catch (Exception ex) {
@@ -415,6 +399,37 @@ public class AIReplyProvider {
             log.warn("Failed to parse AI JSON response: {}", ex.getMessage());
             return Optional.empty();
         }
+    }
+
+    private JsonNode postWithRetry(String uri, String apiKey, Map<String, Object> body) {
+        int attempts = Math.max(1, Math.min(properties.getMaxAttempts(), 3));
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                return defaultRestClient.post()
+                        .uri(uri)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + apiKey)
+                        .body(body)
+                        .retrieve()
+                        .body(JsonNode.class);
+            } catch (RestClientResponseException ex) {
+                // Retrying validation/authentication failures wastes quota and
+                // cannot succeed without a changed request.
+                if (ex.getStatusCode().is4xxClientError()
+                        && ex.getStatusCode().value() != 408
+                        && ex.getStatusCode().value() != 429) {
+                    throw ex;
+                }
+                lastFailure = ex;
+            } catch (ResourceAccessException ex) {
+                lastFailure = ex;
+            }
+            if (attempt < attempts) {
+                log.debug("AI provider transient failure; retrying once (attempt {}/{})", attempt + 1, attempts);
+            }
+        }
+        throw lastFailure != null ? lastFailure : new IllegalStateException("AI provider call failed");
     }
 
     public record GenerationResult(List<ReplySuggestionItem> suggestions, ConversationStateDto state) {

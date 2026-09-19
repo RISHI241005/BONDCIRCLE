@@ -29,14 +29,24 @@ public class ReplyIntentPlanner {
         List<PlannedIntent> planned = new ArrayList<>();
         Set<ReplyStrategy> selected = new LinkedHashSet<>();
 
-        if (env == null || env.stage() == ConversationEnvironment.Stage.NEW_MATCH) {
+        if (env == null) {
             addStrategy(selected, planned, ReplyStrategy.CURIOUS, "Break ice with a personal or interest-based question.", rejectedStrategies);
             addStrategy(selected, planned, ReplyStrategy.PLAYFUL, "Use a lighthearted, playful opener to keep it engaging.", rejectedStrategies);
             addStrategy(selected, planned, ReplyStrategy.THOUGHTFUL, "Provide a warm, relatable starter.", rejectedStrategies);
             return new ReplyIntentPlan(planned);
         }
 
-        // 1. Direct unanswered question from partner
+        if (env.stage() == ConversationEnvironment.Stage.ENDING
+                || env.direction() == ConversationEnvironment.Direction.CLOSING) {
+            addStrategy(selected, planned, ReplyStrategy.ACKNOWLEDGE, "Acknowledge the close without trying to force more conversation.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.SUPPORTIVE, "End warmly and leave the door open naturally.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.PLAYFUL, "Use a light sign-off only if it fits the current tone.", rejectedStrategies);
+            ensureThreeDistinct(selected, planned, rejectedStrategies);
+            return new ReplyIntentPlan(planned);
+        }
+
+        // 1. Direct unanswered question from partner. This must take priority
+        // over a low message count/new-match stage.
         if (env.hasUnansweredQuestion()) {
             addStrategy(selected, planned, ReplyStrategy.ANSWER, "Directly answer the question asked by the other person.", rejectedStrategies);
             addStrategy(selected, planned, ReplyStrategy.ASK_FOLLOWUP, "Answer and ask a reciprocal or curious follow-up.", rejectedStrategies);
@@ -45,21 +55,38 @@ public class ReplyIntentPlanner {
             return new ReplyIntentPlan(planned);
         }
 
-        // 2. Dry conversation revitalization
-        if (env.isDry() || env.stage() == ConversationEnvironment.Stage.DRY) {
-            addStrategy(selected, planned, ReplyStrategy.RE_OPENER, "Revitalize conversation with an unexpected, fun topic.", rejectedStrategies);
-            addStrategy(selected, planned, ReplyStrategy.BANTER, "Playfully poke fun at dry replies or tease them.", rejectedStrategies);
-            addStrategy(selected, planned, ReplyStrategy.CURIOUS, "Ask an engaging, easy-to-answer specific question.", rejectedStrategies);
+        // 2. Planning or invitation also takes priority in a new conversation.
+        if (env.stage() == ConversationEnvironment.Stage.PLANNING
+                || env.responseExpectation() == ConversationEnvironment.ResponseExpectation.ANSWER_REQUIRED) {
+            addStrategy(selected, planned, ReplyStrategy.ANSWER, "Respond directly to plans with schedule or enthusiasm.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.INVITATION, "Co-plan a specific spot or activity.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.PLAYFUL, "Use light enthusiasm while still answering the invitation.", rejectedStrategies);
             ensureThreeDistinct(selected, planned, rejectedStrategies);
             return new ReplyIntentPlan(planned);
         }
 
-        // 3. Emotional support / stress / difficult day
+        // 3. Emotional disclosures deserve acknowledgement even early on.
         if (env.temperature() == ConversationEnvironment.Temperature.EMOTIONAL
                 || env.stage() == ConversationEnvironment.Stage.SUPPORTIVE) {
             addStrategy(selected, planned, ReplyStrategy.EMPATHIZE, "Validate their feelings with genuine empathy.", rejectedStrategies);
-            addStrategy(selected, planned, ReplyStrategy.SUPPORTIVE, "Offer comforting support and invite them to vent if needed.", rejectedStrategies);
-            addStrategy(selected, planned, ReplyStrategy.CURIOUS, "Ask what specifically happened to show attentive care.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.SUPPORTIVE, "Offer comforting support and room to share.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.CURIOUS, "Ask what happened without interrogating them.", rejectedStrategies);
+            ensureThreeDistinct(selected, planned, rejectedStrategies);
+            return new ReplyIntentPlan(planned);
+        }
+
+        if (env.stage() == ConversationEnvironment.Stage.NEW_MATCH) {
+            addStrategy(selected, planned, ReplyStrategy.CURIOUS, "Break ice with a personal or interest-based question.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.PLAYFUL, "Use a lighthearted, playful opener to keep it engaging.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.THOUGHTFUL, "Provide a warm, relatable starter.", rejectedStrategies);
+            return new ReplyIntentPlan(planned);
+        }
+
+        // 4. Dry conversation revitalization
+        if (env.isDry() || env.stage() == ConversationEnvironment.Stage.DRY) {
+            addStrategy(selected, planned, ReplyStrategy.RE_OPENER, "Revitalize conversation with an unexpected, fun topic.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.BANTER, "Playfully poke fun at dry replies or tease them.", rejectedStrategies);
+            addStrategy(selected, planned, ReplyStrategy.CURIOUS, "Ask an engaging, easy-to-answer specific question.", rejectedStrategies);
             ensureThreeDistinct(selected, planned, rejectedStrategies);
             return new ReplyIntentPlan(planned);
         }
@@ -70,16 +97,6 @@ public class ReplyIntentPlanner {
             addStrategy(selected, planned, ReplyStrategy.RECONNECT, "Warmly welcome them back without guilt-tripping.", rejectedStrategies);
             addStrategy(selected, planned, ReplyStrategy.BANTER, "Playful, humorous jab about their disappearance.", rejectedStrategies);
             addStrategy(selected, planned, ReplyStrategy.SUPPORTIVE, "Friendly check-in on how their week has been.", rejectedStrategies);
-            ensureThreeDistinct(selected, planned, rejectedStrategies);
-            return new ReplyIntentPlan(planned);
-        }
-
-        // 5. Planning or invitation
-        if (env.stage() == ConversationEnvironment.Stage.PLANNING
-                || env.responseExpectation() == ConversationEnvironment.ResponseExpectation.ANSWER_REQUIRED) {
-            addStrategy(selected, planned, ReplyStrategy.ANSWER, "Respond directly to plans with schedule or enthusiasm.", rejectedStrategies);
-            addStrategy(selected, planned, ReplyStrategy.INVITATION, "Co-plan a specific spot or exciting activity.", rejectedStrategies);
-            addStrategy(selected, planned, ReplyStrategy.PLAYFUL, "Enthusiastic playful banter about meeting up.", rejectedStrategies);
             ensureThreeDistinct(selected, planned, rejectedStrategies);
             return new ReplyIntentPlan(planned);
         }

@@ -17,9 +17,45 @@ public record MessageIntelligence(
         double humorLevel,
         double flirtLevel,
         double seriousness,
+        double urgency,
+        double friendliness,
+        double enthusiasm,
+        double uncertainty,
+        double openness,
         ConversationalEffort conversationalEffort,
-        boolean expectsResponse
+        boolean introducesNewTopic,
+        boolean referencesEarlierTopic,
+        boolean asksForDisclosure,
+        boolean expectsResponse,
+        String language
 ) {
+
+    /**
+     * Backward-compatible constructor retained for callers that only need the
+     * original compact signal set.
+     */
+    public MessageIntelligence(
+            Long senderId,
+            boolean isCurrentUser,
+            String content,
+            int length,
+            Instant createdAt,
+            Sentiment sentiment,
+            Intensity intensity,
+            Intent intent,
+            String topic,
+            boolean hasQuestion,
+            QuestionImportance questionImportance,
+            double humorLevel,
+            double flirtLevel,
+            double seriousness,
+            ConversationalEffort conversationalEffort,
+            boolean expectsResponse) {
+        this(senderId, isCurrentUser, content, length, createdAt, sentiment, intensity, intent, topic,
+                hasQuestion, questionImportance, humorLevel, flirtLevel, seriousness,
+                0.0, 0.5, 0.5, 0.0, 0.5, conversationalEffort,
+                false, false, false, expectsResponse, "ENGLISH");
+    }
 
     public enum Sentiment {
         POSITIVE,

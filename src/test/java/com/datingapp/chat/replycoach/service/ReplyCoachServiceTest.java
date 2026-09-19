@@ -16,6 +16,7 @@ import com.datingapp.chat.replycoach.entity.AiReplyFeedback;
 import com.datingapp.chat.replycoach.entity.FeedbackAction;
 import com.datingapp.chat.replycoach.model.ConversationAnalysis;
 import com.datingapp.chat.replycoach.model.ConversationContext;
+import com.datingapp.chat.replycoach.model.ConversationEnvironment;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import com.datingapp.chat.replycoach.provider.AIReplyProvider;
 import com.datingapp.chat.replycoach.repository.AiReplyFeedbackRepository;
@@ -149,7 +150,7 @@ class ReplyCoachServiceTest {
         );
         ConversationStateDto aiState = new ConversationStateDto("Weekend Plans", "Friendly", "HIGH", "ENGLISH", false);
 
-        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationAnalysis.class), any(UserWritingProfile.class), anyList(), eq(3)))
+        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationEnvironment.class), any(UserWritingProfile.class), anyList(), anyList(), eq(3)))
                 .thenReturn(Optional.of(new AIReplyProvider.GenerationResult(aiItems, aiState)));
 
         ReplySuggestionResponse response = service.getReplySuggestions(conversationId, userId, 3);
@@ -157,8 +158,9 @@ class ReplyCoachServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getConversationId()).isEqualTo(conversationId);
         assertThat(response.getSuggestions()).hasSize(3);
-        assertThat(response.getSuggestions().get(0).getText()).contains("Saturday afternoon");
-        assertThat(response.getConversationState().getTopic()).isEqualTo("Weekend Plans");
+        assertThat(response.getSuggestions()).noneMatch(item -> item.getText().contains("Saturday afternoon works"));
+        assertThat(response.getSuggestions()).anyMatch(item -> item.getText().toLowerCase().contains("time"));
+        assertThat(response.getConversationState().getTopic()).isEqualTo("Food & Drinks");
 
         // Verify SHOWN feedback is recorded
         verify(feedbackRepository, atLeastOnce()).saveAll(anyList());
@@ -181,7 +183,7 @@ class ReplyCoachServiceTest {
         m1.setCreatedAt(Instant.now().minusSeconds(30));
 
         when(messageRepository.findRecentMessages(eq(1L), anyInt())).thenReturn(List.of(m1));
-        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationAnalysis.class), any(UserWritingProfile.class), anyList(), anyInt()))
+        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationEnvironment.class), any(UserWritingProfile.class), anyList(), anyList(), anyInt()))
                 .thenReturn(Optional.empty());
 
         ReplySuggestionResponse response = service.getReplySuggestions(conversationId, userId, 3);
@@ -211,7 +213,7 @@ class ReplyCoachServiceTest {
         dryMsg.setCreatedAt(Instant.now().minusSeconds(10));
 
         when(messageRepository.findRecentMessages(eq(1L), anyInt())).thenReturn(List.of(dryMsg));
-        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationAnalysis.class), any(UserWritingProfile.class), anyList(), anyInt()))
+        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationEnvironment.class), any(UserWritingProfile.class), anyList(), anyList(), anyInt()))
                 .thenReturn(Optional.empty()); // Trigger fallback with dry=true
 
         ReplySuggestionResponse response = service.getReplySuggestions(conversationId, userId, 3);
@@ -244,7 +246,7 @@ class ReplyCoachServiceTest {
                 new ReplySuggestionItem("s1", rejectedText, "Story", "Curious"),
                 new ReplySuggestionItem("s2", "Sounds like a plan! Where were you thinking?", "Lunch", "Warm")
         );
-        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationAnalysis.class), any(UserWritingProfile.class), anyList(), anyInt()))
+        when(aiReplyProvider.generateSuggestions(any(ConversationContext.class), any(ConversationEnvironment.class), any(UserWritingProfile.class), anyList(), anyList(), anyInt()))
                 .thenReturn(Optional.of(new AIReplyProvider.GenerationResult(aiItems, new ConversationStateDto("Lunch", "Warm", "BALANCED", "ENGLISH", false))));
 
         ReplySuggestionResponse response = service.regenerateReplySuggestions(

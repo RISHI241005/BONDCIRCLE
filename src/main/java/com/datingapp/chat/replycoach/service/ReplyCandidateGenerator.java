@@ -134,40 +134,100 @@ public class ReplyCandidateGenerator {
             return candidates;
         }
 
-        // 3. Unanswered question
+        // 3. Natural closing: do not force another question when the other
+        // person is clearly ending the exchange.
+        if (env.stage() == ConversationEnvironment.Stage.ENDING) {
+            if (isHinglish) {
+                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
+                        "Theek hai, rest karo 😊 baad mein baat karte hain.", "Closing", "Warm",
+                        ReplyStrategy.ACKNOWLEDGE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
+                        "Goodnight! Kal catch up karte hain 😊", "Closing", "Supportive",
+                        ReplyStrategy.SUPPORTIVE.name(), "Casual"));
+                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
+                        "Chalo phir, sleep well 😄", "Closing", "Playful",
+                        ReplyStrategy.PLAYFUL.name(), "Playful"));
+            } else {
+                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
+                        "Alright, rest well 😊 talk later.", "Closing", "Warm",
+                        ReplyStrategy.ACKNOWLEDGE.name(), "Warm"));
+                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
+                        "Goodnight! We can catch up later 😊", "Closing", "Supportive",
+                        ReplyStrategy.SUPPORTIVE.name(), "Casual"));
+                candidates.add(new ReplySuggestionItem(UUID.randomUUID().toString(),
+                        "Sleep well 😄", "Closing", "Playful",
+                        ReplyStrategy.PLAYFUL.name(), "Playful"));
+            }
+            return candidates;
+        }
+
+        // 4. Planning/invitation. Avoid inventing availability: ask for the
+        // concrete time/place so the user can decide and edit before sending.
+        if (env.stage() == ConversationEnvironment.Stage.PLANNING) {
+            if (isHinglish) {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Kal kis time ka soch rahe ho? Main schedule check kar loon.",
+                        "Plans", "Direct", ReplyStrategy.ANSWER.name(), "Casual"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Haan plan bana sakte hain 👀 place kya socha hai?",
+                        "Plans", "Curious", ReplyStrategy.INVITATION.name(), "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Okayy, time aur place bhejo — phir scene lock karte hain 😂",
+                        "Plans", "Playful", ReplyStrategy.PLAYFUL.name(), "Playful"));
+            } else {
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "What time were you thinking? I'll check my schedule.",
+                        "Plans", "Direct", ReplyStrategy.ANSWER.name(), "Casual"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "We could make a plan 👀 where were you thinking?",
+                        "Plans", "Curious", ReplyStrategy.INVITATION.name(), "Curious"));
+                candidates.add(new ReplySuggestionItem(
+                        UUID.randomUUID().toString(),
+                        "Send me the time and place — let's see if we can lock it in 😂",
+                        "Plans", "Playful", ReplyStrategy.PLAYFUL.name(), "Playful"));
+            }
+            return candidates;
+        }
+
+        // 5. Unanswered question
         if (env.hasUnansweredQuestion()) {
             String topic = env.primaryTopic();
             if ("Sports & Fitness".equalsIgnoreCase(topic)) {
                 if (isHinglish) {
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Haan dekha tha! Kya crazy finish tha match ka!",
+                            "Match ka kaunsa moment sabse crazy tha? 👀",
                             "Sports", "Excited",
                             ReplyStrategy.ANSWER.name(), "Playful"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Sach bataun toh pura match nahi dekh paya, score kya raha?",
+                            "Score batao first — phir full match analysis karte hain 😂",
                             "Sports", "Curious",
                             ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Haan! Tum kis team ko support kar rahe the?",
+                            "Tum kis team ko support kar rahe the?",
                             "Sports", "Playful",
                             ReplyStrategy.PLAYFUL.name(), "Playful"));
                 } else {
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Yes I did! That match was absolute madness!",
+                            "Which moment from the match are we talking about? 👀",
                             "Sports", "Excited",
                             ReplyStrategy.ANSWER.name(), "Playful"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "I caught the highlights! Which team were you rooting for?",
+                            "Which team were you rooting for? Give me the match recap 😂",
                             "Sports", "Curious",
                             ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Yes! Can't believe how that game turned out. Did you enjoy it?",
+                            "Okay, give me your honest match review — worth the hype?",
                             "Sports", "Engaged",
                             ReplyStrategy.THOUGHTFUL.name(), "Warm"));
                 }
@@ -175,33 +235,33 @@ public class ReplyCandidateGenerator {
                 if (isHinglish) {
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            wantsShort ? "Haan bas chal raha hai!" : "Haan bas chal raha hai! Tumhara kitna prep hua?",
+                            wantsShort ? "Tumhara kitna prep hua?" : "Pehle tum batao — tumhara kitna prep hua? 😅",
                             "Studies", "Curious",
                             ReplyStrategy.ANSWER.name(), "Warm"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Almost done! Par kaafi intense lag raha hai abhi.",
+                            "Iska honest answer thoda detailed hai 😅 tumhara kaisa chal raha hai?",
                             "Studies", "Direct",
                             ReplyStrategy.ANSWER.name(), "Thoughtful"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Haha mat pucho! Study break lene ka mann kar raha hai 😂",
+                            "Ye question sunte hi study break yaad aa gaya 😂",
                             "Studies", "Playful",
                             ReplyStrategy.BANTER.name(), "Playful"));
                 } else {
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            wantsShort ? "Making good progress on it!" : "Making good progress on it! How is yours going?",
+                            wantsShort ? "How is yours going?" : "I'll give you the full update — how is yours going?",
                             "Studies", "Curious",
                             ReplyStrategy.ANSWER.name(), "Warm"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Almost done with it, though it's been pretty intense today!",
+                            "That needs an honest update 😅 which part are you asking about?",
                             "Studies", "Direct",
                             ReplyStrategy.ANSWER.name(), "Thoughtful"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Haha don't ask! Already dreaming about a study break 😂",
+                            "That question alone makes a study break sound good 😂",
                             "Studies", "Playful",
                             ReplyStrategy.BANTER.name(), "Playful"));
                 }
@@ -214,7 +274,7 @@ public class ReplyCandidateGenerator {
                             ReplyStrategy.ANSWER.name(), "Playful"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "Sach bataun toh haan! Tumhara kya opinion hai ispe?",
+                            "Pehle tumhara opinion sunna hai ispe 👀",
                             "Curious", "Curious",
                             ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
                     candidates.add(new ReplySuggestionItem(
@@ -230,7 +290,7 @@ public class ReplyCandidateGenerator {
                             ReplyStrategy.ANSWER.name(), "Playful"));
                     candidates.add(new ReplySuggestionItem(
                             UUID.randomUUID().toString(),
-                            "To be completely honest, yes! What's your take on it though?",
+                            "I want your take first 👀 then I'll give you mine.",
                             "Curious", "Curious",
                             ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
                     candidates.add(new ReplySuggestionItem(
@@ -243,45 +303,45 @@ public class ReplyCandidateGenerator {
             return candidates;
         }
 
-        // 4. Reconnecting after a gap
+        // 6. Reconnecting after a gap
         if (env.stage() == ConversationEnvironment.Stage.RECONNECTING) {
             if (isHinglish) {
                 candidates.add(new ReplySuggestionItem(
                         UUID.randomUUID().toString(),
-                        "Hey stranger! Look who's back 😊 Kaise ho?",
+                        "Heyy 😊 Kaise ho? Kya chal raha hai aaj kal?",
                         "Reconnection", "Warm",
                         ReplyStrategy.SUPPORTIVE.name(), "Warm"));
                 candidates.add(new ReplySuggestionItem(
                         UUID.randomUUID().toString(),
-                        "Hey! Itne dino baad! Sab theek chal raha hai na?",
+                        "Hey! Sab theek chal raha hai na?",
                         "Catchup", "Curious",
                         ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
                 candidates.add(new ReplySuggestionItem(
                         UUID.randomUUID().toString(),
-                        "Look who finally remembered me! 😂 Kya chal raha hai aaj kal?",
+                        "Heyy 😂 Kya chal raha hai aaj kal?",
                         "Banter", "Playful",
                         ReplyStrategy.BANTER.name(), "Playful"));
             } else {
                 candidates.add(new ReplySuggestionItem(
                         UUID.randomUUID().toString(),
-                        "Hey stranger! Look who's back 😊 How have you been?",
+                        "Heyy 😊 How have you been?",
                         "Reconnection", "Warm",
                         ReplyStrategy.SUPPORTIVE.name(), "Warm"));
                 candidates.add(new ReplySuggestionItem(
                         UUID.randomUUID().toString(),
-                        "Hey! Was just thinking about you earlier. How are things with you?",
+                        "Hey! How have things been with you lately?",
                         "Catchup", "Thoughtful",
                         ReplyStrategy.THOUGHTFUL.name(), "Warm"));
                 candidates.add(new ReplySuggestionItem(
                         UUID.randomUUID().toString(),
-                        "Look who's back from the dead! 😂 What have you been up to?",
+                        "Hey you 😂 what have you been up to lately?",
                         "Banter", "Playful",
                         ReplyStrategy.BANTER.name(), "Playful"));
             }
             return candidates;
         }
 
-        // 5. Emotional support / rough day
+        // 7. Emotional support / rough day
         if (env.temperature() == ConversationEnvironment.Temperature.EMOTIONAL
                 || env.stage() == ConversationEnvironment.Stage.SUPPORTIVE) {
             if (isHinglish) {
@@ -320,7 +380,7 @@ public class ReplyCandidateGenerator {
             return candidates;
         }
 
-        // 6. Active dialogue / topic continuation
+        // 8. Active dialogue / topic continuation
         String topic = env.primaryTopic();
         if ("Sports & Fitness".equalsIgnoreCase(topic)) {
             if (isHinglish) {
@@ -385,7 +445,7 @@ public class ReplyCandidateGenerator {
                     ReplyStrategy.PLAYFUL.name(), "Playful"));
             candidates.add(new ReplySuggestionItem(
                     UUID.randomUUID().toString(),
-                    "Bilkul sahi kaha tumne, I totally agree with you on this!",
+                    "Interesting take 👀 tumhe aisa kyun laga?",
                     "Agreement", "Thoughtful",
                     ReplyStrategy.THOUGHTFUL.name(), "Thoughtful"));
         } else {
@@ -396,7 +456,7 @@ public class ReplyCandidateGenerator {
                     ReplyStrategy.ASK_FOLLOWUP.name(), "Curious"));
             candidates.add(new ReplySuggestionItem(
                     UUID.randomUUID().toString(),
-                    "That sounds awesome! I completely agree with you on that.",
+                    "Okay, that's an interesting take — what made you see it that way?",
                     "Supportive", "Warm",
                     ReplyStrategy.SUPPORTIVE.name(), "Warm"));
             candidates.add(new ReplySuggestionItem(

@@ -24,6 +24,18 @@ public interface AiReplyFeedbackRepository extends JpaRepository<AiReplyFeedback
         return findRecentTextsByAction(userId, FeedbackAction.USED, pageable);
     }
 
+    @Query("SELECT f.suggestionText FROM AiReplyFeedback f WHERE f.userId = :userId AND f.action IN :actions ORDER BY f.createdAt DESC")
+    List<String> findRecentTextsByActions(
+            @Param("userId") Long userId,
+            @Param("actions") List<FeedbackAction> actions,
+            Pageable pageable);
+
+    default List<String> findRecentPositiveTexts(Long userId, Pageable pageable) {
+        return findRecentTextsByActions(userId,
+                List.of(FeedbackAction.USED, FeedbackAction.COPIED, FeedbackAction.EDITED,
+                        FeedbackAction.SENT, FeedbackAction.LIKED), pageable);
+    }
+
     default List<String> findRecentRejectedTexts(Long userId, Pageable pageable) {
         return findRecentTextsByAction(userId, FeedbackAction.REJECTED, pageable);
     }

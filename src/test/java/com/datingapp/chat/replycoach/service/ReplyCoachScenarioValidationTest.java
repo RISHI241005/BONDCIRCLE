@@ -132,7 +132,7 @@ class ReplyCoachScenarioValidationTest {
                 createMsg(partnerUserId, "Just got home 😭", Instant.now().minusSeconds(10)),
                 createMsg(currentUserId, "Hey! How was work today?", Instant.now().minusSeconds(30))
         );
-        when(messageRepository.findRecentMessages(10L, 20)).thenReturn(msgs);
+        when(messageRepository.findRecentMessages(10L, 40)).thenReturn(msgs);
 
         ReplySuggestionResponse response = replyCoachService.getReplySuggestions(conversationId, currentUserId, 3);
 
@@ -152,7 +152,7 @@ class ReplyCoachScenarioValidationTest {
                 createMsg(partnerUserId, "What are you studying in college?", Instant.now().minusSeconds(15)),
                 createMsg(currentUserId, "I'm at university right now.", Instant.now().minusSeconds(45))
         );
-        when(messageRepository.findRecentMessages(10L, 20)).thenReturn(msgs);
+        when(messageRepository.findRecentMessages(10L, 40)).thenReturn(msgs);
 
         ReplySuggestionResponse response = replyCoachService.getReplySuggestions(conversationId, currentUserId, 3);
 
@@ -169,7 +169,7 @@ class ReplyCoachScenarioValidationTest {
                 createMsg(partnerUserId, "Did you watch the football match last night?", Instant.now().minusSeconds(10)),
                 createMsg(currentUserId, "Yes! What a game that was!", Instant.now().minusSeconds(50))
         );
-        when(messageRepository.findRecentMessages(10L, 20)).thenReturn(msgs);
+        when(messageRepository.findRecentMessages(10L, 40)).thenReturn(msgs);
 
         ReplySuggestionResponse response = replyCoachService.getReplySuggestions(conversationId, currentUserId, 3);
 
@@ -187,7 +187,7 @@ class ReplyCoachScenarioValidationTest {
                 createMsg(partnerUserId, "ok", Instant.now().minusSeconds(20)),
                 createMsg(partnerUserId, "nice", Instant.now().minusSeconds(30))
         );
-        when(messageRepository.findRecentMessages(10L, 20)).thenReturn(msgs);
+        when(messageRepository.findRecentMessages(10L, 40)).thenReturn(msgs);
 
         ReplySuggestionResponse response = replyCoachService.getReplySuggestions(conversationId, currentUserId, 3);
 
@@ -204,7 +204,7 @@ class ReplyCoachScenarioValidationTest {
         List<Message> msgs = List.of(
                 createMsg(partnerUserId, "Today was honestly terrible and exhausting.", Instant.now().minusSeconds(10))
         );
-        when(messageRepository.findRecentMessages(10L, 20)).thenReturn(msgs);
+        when(messageRepository.findRecentMessages(10L, 40)).thenReturn(msgs);
 
         ReplySuggestionResponse response = replyCoachService.getReplySuggestions(conversationId, currentUserId, 3);
 
@@ -217,7 +217,7 @@ class ReplyCoachScenarioValidationTest {
     @Test
     @DisplayName("Scenario 6 — New Conversation: Empty chat uses partner profile interests for contextual icebreakers")
     void testScenario6_NewConversationIcebreakers() {
-        when(messageRepository.findRecentMessages(10L, 20)).thenReturn(Collections.emptyList());
+        when(messageRepository.findRecentMessages(10L, 40)).thenReturn(Collections.emptyList());
 
         ReplySuggestionResponse response = replyCoachService.getReplySuggestions(conversationId, currentUserId, 3);
 
@@ -234,7 +234,7 @@ class ReplyCoachScenarioValidationTest {
         List<Message> msgs = List.of(
                 createMsg(partnerUserId, "Hey! How is your week going?", Instant.now().minusSeconds(10))
         );
-        when(messageRepository.findRecentMessages(10L, 20)).thenReturn(msgs);
+        when(messageRepository.findRecentMessages(10L, 40)).thenReturn(msgs);
 
         List<String> rejectedTexts = List.of(
                 "Haha no way! What happened after that?",
@@ -271,14 +271,16 @@ class ReplyCoachScenarioValidationTest {
                 createMsg(partnerUserId, "See you soon!", threeDaysAgo),
                 createMsg(currentUserId, "Awesome, take care!", threeDaysAgo.minusSeconds(60))
         );
-        when(messageRepository.findRecentMessages(10L, 20)).thenReturn(msgs);
+        when(messageRepository.findRecentMessages(10L, 40)).thenReturn(msgs);
 
         ReplySuggestionResponse response = replyCoachService.getReplySuggestions(conversationId, currentUserId, 3);
 
         assertThat(response.getConversationState().getStage()).isEqualTo("RECONNECTING");
         boolean hasReconnectionText = response.getSuggestions().stream()
-                .anyMatch(s -> s.getText().contains("stranger") || s.getText().contains("thinking about you") || s.getText().contains("back"));
+                .anyMatch(s -> s.getText().contains("How have") || s.getText().contains("what have you been up to"));
         assertThat(hasReconnectionText).isTrue();
+        assertThat(response.getSuggestions()).noneMatch(s ->
+                s.getText().contains("finally") || s.getText().contains("remembered me"));
     }
 
     @Test
@@ -288,7 +290,7 @@ class ReplyCoachScenarioValidationTest {
                 createMsg(partnerUserId, "Arre yaar aaj ka din bohot mast raha!", Instant.now().minusSeconds(10)),
                 createMsg(currentUserId, "Sach me? Aisa kya hua bhai?", Instant.now().minusSeconds(40))
         );
-        when(messageRepository.findRecentMessages(10L, 20)).thenReturn(msgs);
+        when(messageRepository.findRecentMessages(10L, 40)).thenReturn(msgs);
 
         ReplySuggestionResponse response = replyCoachService.getReplySuggestions(conversationId, currentUserId, 3);
 

@@ -16,7 +16,6 @@ import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
 import com.datingapp.chat.replycoach.dto.ReplySuggestionResponse;
 import com.datingapp.chat.replycoach.entity.AiReplyFeedback;
 import com.datingapp.chat.replycoach.entity.FeedbackAction;
-import com.datingapp.chat.replycoach.model.ConversationAnalysis;
 import com.datingapp.chat.replycoach.model.ConversationContext;
 import com.datingapp.chat.replycoach.model.ConversationEnvironment;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
@@ -234,21 +233,22 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
         User currentUser = userRepository.findById(userId).orElse(null);
         User otherUser = otherUserId != null ? userRepository.findById(otherUserId).orElse(null) : null;
 
-        // 3. Retrieve recent messages (up to MAX_CONTEXT_MESSAGES=20)
-        List<Message> rawMessages = messageRepository.findRecentMessages(conversation.getId(), MAX_CONTEXT_MESSAGES);
+        // 3. Fetch a bounded history. Only the newest messages go to the LLM;
+        // older messages feed memory and style extraction.
+        List<Message> rawMessages = messageRepository.findRecentMessages(conversation.getId(), MAX_FETCH_MESSAGES);
+        if (rawMessages == null) rawMessages = List.of();
         List<Message> chronologicalMessages = new ArrayList<>(rawMessages.stream()
                 .filter(m -> !m.isDeleted())
                 .toList());
         Collections.reverse(chronologicalMessages); // Chronological order (oldest to newest)
 
-        // 4. Build Context Messages & formatted dialogue
-        List<ConversationContext.ContextMessage> contextMessages = new ArrayList<>();
-        List<String> formattedDialogue = new ArrayList<>();
+        // 4. Normalize the fetched history, then select recent context.
+        List<ConversationContext.ContextMessage> historyMessages = new ArrayList<>();
         for (Message msg : chronologicalMessages) {
             String content = msg.getContent() != null ? msg.getContent().trim() : "";
             if (content.isEmpty()) continue;
             boolean isCurrentUser = msg.getSenderId().equals(userId);
-            contextMessages.add(new ConversationContext.ContextMessage(
+            historyMessages.add(new ConversationContext.ContextMessage(
                     msg.getId(),
                     msg.getPublicId(),
                     msg.getSenderId(),
@@ -256,15 +256,18 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
                     isCurrentUser,
                     msg.getCreatedAt()
             ));
-            if (isCurrentUser) {
-                formattedDialogue.add("CURRENT_USER (YOU): " + content);
-            } else {
-                formattedDialogue.add("OTHER_USER: " + content);
-            }
         }
 
-        // Extract long-term memories
-        List<String> longTermMemories = memoryExtractor.extractMemories(contextMessages, 10);
+        int recentStart = Math.max(0, historyMessages.size() - MAX_CONTEXT_MESSAGES);
+        List<ConversationContext.ContextMessage> contextMessages = new ArrayList<>(
+                historyMessages.subList(recentStart, historyMessages.size()));
+
+        // Extract memory only from messages outside the recent context to avoid
+        // repeating the same line in both memory and dialogue sections.
+        List<ConversationContext.ContextMessage> olderMessages = recentStart > 0
+                ? historyMessages.subList(0, recentStart)
+                : List.of();
+        List<String> longTermMemories = memoryExtractor.extractMemories(olderMessages, 10);
 
         String userInterests = currentUser != null ? currentUser.getInterests() : "";
         String partnerInterests = otherUser != null ? otherUser.getInterests() : "";
@@ -281,8 +284,7 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
 
         // 5. Run Conversation Intelligence Environment Analysis & User Style Engine
         ConversationEnvironment env = conversationIntelligenceService.analyzeEnvironment(context);
-        ConversationAnalysis analysis = ConversationAnalysis.fromEnvironment(env);
-        UserWritingProfile styleProfile = userStyleEngine.analyzeStyle(userId, contextMessages, env.language());
+        UserWritingProfile styleProfile = userStyleEngine.analyzeStyle(userId, historyMessages, env.language());
 
         // 6. Plan Reply Intents
         ReplyIntentPlanner.ReplyIntentPlan intentPlan = replyIntentPlanner.planIntents(env, styleProfile);
@@ -324,78 +326,28 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
             log.debug("Advanced generation call threw: {}", ex.getMessage());
         }
 
-        // Backward-compatibility: if advanced call returns empty, check legacy ConversationAnalysis method
-        if (aiResult.isEmpty()) {
-            try {
-                aiResult = aiReplyProvider.generateSuggestions(
-                        context,
-                        analysis,
-                        styleProfile,
-                        combinedRejectedTexts,
-                        limit
-                );
-            } catch (Exception ex) {
-                log.debug("ConversationAnalysis generation call threw: {}", ex.getMessage());
-            }
-        }
+        // 9. Merge provider output with deterministic candidates. This both
+        // fills partial/malformed provider results and lets every path pass
+        // through the same safety, truthfulness, diversity, and ranking gates.
+        List<ReplySuggestionItem> candidatePool = new ArrayList<>();
+        aiResult.ifPresent(result -> candidatePool.addAll(result.suggestions()));
+        candidatePool.addAll(candidateGenerator.generateCandidates(
+                context, env, styleProfile, combinedRejectedTexts, limit));
 
-        // Backward-compatibility: if that also returns empty, check raw formattedDialogue method
-        if (aiResult.isEmpty()) {
-            try {
-                aiResult = aiReplyProvider.generateSuggestions(
-                        formattedDialogue,
-                        env.language(),
-                        env.isDry(),
-                        combinedRejectedTexts,
-                        styleProfile.promptDirectives(),
-                        userInterests,
-                        partnerInterests,
-                        limit
-                );
-            } catch (Exception ex) {
-                log.debug("Legacy formattedDialogue generation call threw: {}", ex.getMessage());
-            }
-        }
+        List<ReplySuggestionItem> safeCandidates = qualityFilter.filter(
+                candidatePool, combinedRejectedTexts, context, Math.min(12, candidatePool.size()));
+        List<ReplySuggestionItem> finalSuggestions = replyRanker.rankAndFilter(
+                safeCandidates,
+                env,
+                styleProfile,
+                intentPlan.getStrategies(),
+                combinedRejectedTexts,
+                limit
+        );
 
-        List<ReplySuggestionItem> finalSuggestions;
-        ConversationStateDto finalState;
-
-        if (aiResult.isPresent() && !aiResult.get().suggestions().isEmpty()) {
-            // Apply quality filter to remove hallucinations, harassment, or near-duplicates
-            List<ReplySuggestionItem> validSuggestions = qualityFilter.filter(
-                    aiResult.get().suggestions(), combinedRejectedTexts, limit);
-
-            if (!validSuggestions.isEmpty()) {
-                finalSuggestions = validSuggestions;
-                finalState = aiResult.get().state();
-                if (finalState == null) {
-                    finalState = buildStateDto(env, context);
-                }
-            } else {
-                List<ReplySuggestionItem> fallbackCandidates = candidateGenerator.generateCandidates(
-                        context, env, styleProfile, combinedRejectedTexts, limit);
-                finalSuggestions = qualityFilter.filter(fallbackCandidates, combinedRejectedTexts, limit);
-                finalState = buildStateDto(env, context);
-            }
-        } else {
-            // Fallback generation: intelligent, context-aware, non-repetitive
-            List<ReplySuggestionItem> fallbackCandidates = candidateGenerator.generateCandidates(
-                    context, env, styleProfile, combinedRejectedTexts, limit);
-
-            List<ReplySuggestionItem> filteredFallback = qualityFilter.filter(
-                    fallbackCandidates, combinedRejectedTexts, limit);
-
-            finalSuggestions = replyRanker.rankAndFilter(
-                    filteredFallback.isEmpty() ? fallbackCandidates : filteredFallback,
-                    env,
-                    styleProfile,
-                    intentPlan.getStrategies(),
-                    combinedRejectedTexts,
-                    limit
-            );
-
-            finalState = buildStateDto(env, context);
-        }
+        // Conversation state is deterministic and authorization-bound; never
+        // let model-generated metadata override the backend's analysis.
+        ConversationStateDto finalState = buildStateDto(env, context);
 
         // Auto-record SHOWN feedback
         recordShownFeedbackAsync(userId, conversationId, finalSuggestions);

@@ -61,3 +61,14 @@ chat:
     history-messages: ${AI_ASSISTANT_HISTORY_MESSAGES:40}
     max-suggestions: ${AI_ASSISTANT_MAX_SUGGESTIONS:12}
     max-output-tokens: ${AI_ASSISTANT_MAX_OUTPUT_TOKENS:1800}
+    max-attempts: ${AI_ASSISTANT_MAX_ATTEMPTS:2}
+    ranking:
+      context-relevance: ${AI_RANK_CONTEXT_RELEVANCE:0.25}
+      user-style-match: ${AI_RANK_USER_STYLE_MATCH:0.15}
+      language-match: ${AI_RANK_LANGUAGE_MATCH:0.10}
+      tone-match: ${AI_RANK_TONE_MATCH:0.10}
+      strategy-fit: ${AI_RANK_STRATEGY_FIT:0.10}
+      engagement-potential: ${AI_RANK_ENGAGEMENT_POTENTIAL:0.10}
+      personalization: ${AI_RANK_PERSONALIZATION:0.10}
+      novelty: ${AI_RANK_NOVELTY:0.05}
+      feedback-preference: ${AI_RANK_FEEDBACK_PREFERENCE:0.05}

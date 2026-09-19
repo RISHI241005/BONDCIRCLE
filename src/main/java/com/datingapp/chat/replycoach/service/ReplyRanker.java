@@ -1,9 +1,11 @@
 package com.datingapp.chat.replycoach.service;
 
+import com.datingapp.chat.config.ReplyRankingProperties;
 import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
 import com.datingapp.chat.replycoach.model.ConversationEnvironment;
 import com.datingapp.chat.replycoach.model.ReplyStrategy;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -16,6 +18,17 @@ import java.util.Set;
 
 @Service
 public class ReplyRanker {
+
+    private final ReplyRankingProperties weights;
+
+    @Autowired
+    public ReplyRanker(ReplyRankingProperties weights) {
+        this.weights = weights != null ? weights : new ReplyRankingProperties();
+    }
+
+    public ReplyRanker() {
+        this(new ReplyRankingProperties());
+    }
 
     public record ScoredReply(ReplySuggestionItem item, double score) {}
 
@@ -120,15 +133,17 @@ public class ReplyRanker {
         double novelty = calculateNovelty(text, rejectedTexts);
         double feedbackPreference = calculateFeedbackPref(item.getStrategy(), styleProfile);
 
-        return (0.25 * contextRelevance)
-                + (0.15 * userStyleMatch)
-                + (0.10 * languageMatch)
-                + (0.10 * toneMatch)
-                + (0.10 * strategyFit)
-                + (0.10 * engagementPotential)
-                + (0.10 * personalization)
-                + (0.05 * novelty)
-                + (0.05 * feedbackPreference);
+        double total = weights.totalWeight();
+        if (total <= 0.0) total = 1.0;
+        return ((weights.getContextRelevance() * contextRelevance)
+                + (weights.getUserStyleMatch() * userStyleMatch)
+                + (weights.getLanguageMatch() * languageMatch)
+                + (weights.getToneMatch() * toneMatch)
+                + (weights.getStrategyFit() * strategyFit)
+                + (weights.getEngagementPotential() * engagementPotential)
+                + (weights.getPersonalization() * personalization)
+                + (weights.getNovelty() * novelty)
+                + (weights.getFeedbackPreference() * feedbackPreference)) / total;
     }
 
     private double calculateRelevance(String text, ConversationEnvironment env) {

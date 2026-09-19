@@ -1,6 +1,7 @@
 package com.datingapp.chat.replycoach.service;
 
 import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
+import com.datingapp.chat.replycoach.model.ConversationContext;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ public class ReplyCoachQualityFilter {
 
     // Safety / Toxic communication patterns
     private static final Pattern TOXIC_PATTERNS = Pattern.compile(
-            "\\b(why did you ignore me|why did you disappear|you never text back|you hate me|you owe me|answer me now|unblock me|creep|kill yourself|die|bitch|bastard|hate you|shut up)\\b",
+            "\\b(why did you ignore me|why did you disappear|you never text back|you hate me|you owe me|answer me now|unblock me|if you cared|prove you love me|you have to|do it or else|creep|kill yourself|die|bitch|bastard|hate you|shut up)\\b",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -29,12 +30,27 @@ public class ReplyCoachQualityFilter {
             Pattern.CASE_INSENSITIVE
     );
 
+    private static final Pattern FIRST_PERSON_FACT_PATTERN = Pattern.compile(
+            "\\b(i (?:watched|saw|went|visited|bought|met|finished|studied|live in|work at|was at|have been to|caught the highlights|'?m free)|yes i did|haan dekha tha|almost done|(?:today|tomorrow|tonight|saturday|sunday) (?:(?:morning|afternoon|evening) )?works (?:great )?for me)\\b",
+            Pattern.CASE_INSENSITIVE
+    );
+
     public List<ReplySuggestionItem> filter(
             List<ReplySuggestionItem> suggestions,
             List<String> rejectedTexts,
             int limit) {
+        return filter(suggestions, rejectedTexts, null, limit);
+    }
 
-        int maxCount = Math.max(1, Math.min(limit, 3));
+    public List<ReplySuggestionItem> filter(
+            List<ReplySuggestionItem> suggestions,
+            List<String> rejectedTexts,
+            ConversationContext context,
+            int limit) {
+
+        // This filter is also used on the internal candidate pool before the
+        // ranker. The API layer still caps the final response at three.
+        int maxCount = Math.max(1, Math.min(limit, 12));
         if (suggestions == null || suggestions.isEmpty()) {
             return Collections.emptyList();
         }
@@ -61,14 +77,18 @@ public class ReplyCoachQualityFilter {
 
             // Anti-hallucination check
             if (FABRICATED_EXPERIENCE_PATTERNS.matcher(text).find()) continue;
+            if (appearsToInventUserFact(text, context)) continue;
 
             String norm = normalize(text);
             if (seenNormalized.contains(norm)) continue;
             if (normalizedRejected.contains(norm)) continue;
+            if (normalizedRejected.stream().anyMatch(rejected -> similarity(norm, rejected) >= 0.55)) continue;
 
             // Check near-duplicate (starts with identical 20 characters or high overlap)
             boolean isNearDup = seenNormalized.stream()
-                    .anyMatch(s -> norm.length() > 20 && s.length() > 20 && norm.substring(0, Math.min(20, norm.length())).equals(s.substring(0, Math.min(20, s.length()))));
+                    .anyMatch(s -> similarity(norm, s) >= 0.55
+                            || (norm.length() > 20 && s.length() > 20
+                            && norm.substring(0, 20).equals(s.substring(0, 20))));
             if (isNearDup) continue;
 
             seenNormalized.add(norm);
@@ -87,5 +107,46 @@ public class ReplyCoachQualityFilter {
                 .replaceAll("[^a-zA-Z0-9\\s]", "")
                 .replaceAll("\\s+", " ")
                 .trim();
+    }
+
+    private boolean appearsToInventUserFact(String text, ConversationContext context) {
+        if (!FIRST_PERSON_FACT_PATTERN.matcher(text).find()) return false;
+        if (context == null) return true;
+        String normalizedSuggestion = normalize(text);
+        String knownUserFacts = ((context.currentUserInterests() == null ? "" : context.currentUserInterests()) + " "
+                + context.messages().stream()
+                .filter(ConversationContext.ContextMessage::isCurrentUser)
+                .map(ConversationContext.ContextMessage::content)
+                .filter(java.util.Objects::nonNull)
+                .reduce("", (left, right) -> left + " " + right)).toLowerCase(Locale.ROOT);
+
+        // Require at least two meaningful words from the claimed draft to be
+        // supported by facts the current user actually supplied.
+        long supportedWords = tokenize(normalizedSuggestion).stream()
+                .filter(word -> word.length() >= 4)
+                .filter(knownUserFacts::contains)
+                .count();
+        return supportedWords < 2;
+    }
+
+    private double similarity(String left, String right) {
+        Set<String> a = tokenize(left);
+        Set<String> b = tokenize(right);
+        if (a.isEmpty() || b.isEmpty()) return 0.0;
+        Set<String> intersection = new HashSet<>(a);
+        intersection.retainAll(b);
+        Set<String> union = new HashSet<>(a);
+        union.addAll(b);
+        return (double) intersection.size() / union.size();
+    }
+
+    private Set<String> tokenize(String value) {
+        Set<String> tokens = new HashSet<>();
+        for (String token : normalize(value).split("\\s+")) {
+            if (!token.isBlank() && !Set.of("the", "a", "an", "to", "is", "it", "that", "this", "and", "or", "i").contains(token)) {
+                tokens.add(token);
+            }
+        }
+        return tokens;
     }
 }

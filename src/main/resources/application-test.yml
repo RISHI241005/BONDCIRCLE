@@ -17,6 +17,10 @@ spring:
     enabled: false
 
 chat:
+  # Tests must never spend provider quota or depend on an external model.
+  ai-assistant:
+    enabled: false
+    api-key: ""
   jwt:
     secret: test-only-secret-key-change-before-production-0123456789abcdef
     issuer: test-dating-auth

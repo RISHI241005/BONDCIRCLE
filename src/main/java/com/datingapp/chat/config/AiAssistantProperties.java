@@ -15,6 +15,7 @@ public class AiAssistantProperties {
     private int historyMessages = 40;
     private int maxSuggestions = 12;
     private int maxOutputTokens = 1400;
+    private int maxAttempts = 2;
 
     public boolean isEnabled() {
         return enabled;
@@ -78,6 +79,14 @@ public class AiAssistantProperties {
 
     public void setMaxOutputTokens(int maxOutputTokens) {
         this.maxOutputTokens = maxOutputTokens;
+    }
+
+    public int getMaxAttempts() {
+        return maxAttempts;
+    }
+
+    public void setMaxAttempts(int maxAttempts) {
+        this.maxAttempts = Math.max(1, Math.min(maxAttempts, 3));
     }
 
     public String resolveBaseUrl(String provider) {
