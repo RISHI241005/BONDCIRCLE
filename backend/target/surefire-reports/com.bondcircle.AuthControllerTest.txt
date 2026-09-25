@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.bondcircle.AuthControllerTest
--------------------------------------------------------------------------------
-Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 9.097 s -- in com.bondcircle.AuthControllerTest

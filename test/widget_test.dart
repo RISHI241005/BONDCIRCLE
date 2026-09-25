@@ -71,6 +71,15 @@ void main() {
       find.byKey(const Key('confirmPasswordField')),
       'different123',
     );
+    await tester.ensureVisible(find.byKey(const Key('verifyEmailButton')));
+    await tester.tap(find.byKey(const Key('verifyEmailButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('verificationCodeField')), '123456');
+    await tester.ensureVisible(find.byKey(const Key('verifyCodeButton')));
+    await tester.tap(find.byKey(const Key('verifyCodeButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Verified ✓'), findsOneWidget);
+
     await tester.ensureVisible(find.byKey(const Key('continueButton')));
     await tester.tap(find.byKey(const Key('continueButton')));
     await tester.pumpAndSettle();
@@ -82,8 +91,12 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('continueButton')));
     await tester.tap(find.byKey(const Key('continueButton')));
     await tester.pumpAndSettle();
-    expect(find.text('Account created successfully! Please sign in.'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
+    expect(find.text('Account created successfully'), findsOneWidget);
+    expect(find.byKey(const Key('continueToProfileButton')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('continueToProfileButton')));
+    await tester.tap(find.byKey(const Key('continueToProfileButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Create profile'), findsOneWidget);
   });
 
   testWidgets('profile setup validates required details', (tester) async {
@@ -407,6 +420,19 @@ class MockAuthApiService extends AuthApiService {
   }
 
   @override
+  Future<AuthResult> sendVerificationCode({required String email}) async {
+    return AuthResult.success(message: 'Verification code sent.');
+  }
+
+  @override
+  Future<AuthResult> verifyCode({
+    required String email,
+    required String code,
+  }) async {
+    return AuthResult.success(message: 'Email verified successfully');
+  }
+
+  @override
   Future<AuthResult> signUp({
     required String name,
     required String email,
@@ -414,7 +440,7 @@ class MockAuthApiService extends AuthApiService {
   }) async {
     return AuthResult.success(
       user: AuthUser(id: 2, name: name, email: email),
-      message: 'Account created successfully! Please sign in.',
+      message: 'Account created successfully',
     );
   }
 }

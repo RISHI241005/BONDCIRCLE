@@ -14,10 +14,20 @@ spring:
       ddl-auto: update
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: false
 
 jwt:
   secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+brevo:
+  api-key: ${BREVO_API_KEY:}
+  sender-email: ${BREVO_SENDER_EMAIL:sagarkewat12121@gmail.com}
+  sender-name: ${BREVO_SENDER_NAME:BondCircle}
+  api-url: ${BREVO_API_URL:https://api.brevo.com/v3/smtp/email}
+
+verification:
+  expiration-minutes: ${VERIFICATION_EXPIRATION_MINUTES:10}
+  cooldown-seconds: ${VERIFICATION_COOLDOWN_SECONDS:60}
+  max-attempts: ${VERIFICATION_MAX_ATTEMPTS:5}

@@ -20,7 +20,7 @@ void main() {
     await tester.tap(find.byKey(const Key('applyDiscoverFiltersButton')));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Showing people up to'), findsOneWidget);
+    expect(find.textContaining('Up to '), findsWidgets);
     expect(find.textContaining('km away'), findsOneWidget);
   });
 

@@ -36,4 +36,10 @@ class ApiConfig {
   static Uri get signupUri => Uri.parse('$baseUrl/api/auth/signup');
   static Uri get loginUri => Uri.parse('$baseUrl/api/auth/login');
   static Uri get meUri => Uri.parse('$baseUrl/api/auth/me');
+  static Uri get sendVerificationUri => Uri.parse('$baseUrl/api/auth/send-verification');
+  static Uri get verifyCodeUri => Uri.parse('$baseUrl/api/auth/verify-code');
+  static Uri get forgotPasswordSendCodeUri => Uri.parse('$baseUrl/api/auth/forgot-password/send-code');
+  static Uri get forgotPasswordVerifyCodeUri => Uri.parse('$baseUrl/api/auth/forgot-password/verify-code');
+  static Uri get forgotPasswordResetUri => Uri.parse('$baseUrl/api/auth/forgot-password/reset');
+  static Uri get profileMeUri => Uri.parse('$baseUrl/api/profile/me');
 }

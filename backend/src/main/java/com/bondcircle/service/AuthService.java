@@ -2,6 +2,7 @@ package com.bondcircle.service;
 
 import com.bondcircle.dto.*;
 import com.bondcircle.entity.User;
+import com.bondcircle.exception.EmailNotVerifiedException;
 import com.bondcircle.exception.InvalidCredentialsException;
 import com.bondcircle.exception.UserAlreadyExistsException;
 import com.bondcircle.repository.UserRepository;
@@ -16,13 +17,16 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final VerificationService verificationService;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       VerificationService verificationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.verificationService = verificationService;
     }
 
     @Transactional
@@ -33,9 +37,16 @@ public class AuthService {
             throw new UserAlreadyExistsException("An account with this email already exists.");
         }
 
+        if (!verificationService.isEmailVerified(normalizedEmail)) {
+            throw new EmailNotVerifiedException("Email address has not been verified. Please verify your email first.");
+        }
+
         String passwordHash = passwordEncoder.encode(request.getPassword());
         User user = new User(request.getName().trim(), normalizedEmail, passwordHash);
+        user.setEmailVerified(true);
         User savedUser = userRepository.save(user);
+
+        verificationService.consumeVerification(normalizedEmail);
 
         UserDto userDto = new UserDto(savedUser.getId(), savedUser.getName(), savedUser.getEmail());
         return AuthResponse.signupSuccess(userDto);

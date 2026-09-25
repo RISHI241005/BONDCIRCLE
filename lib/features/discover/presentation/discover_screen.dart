@@ -521,14 +521,16 @@ class _DiscoverFiltersScreenState extends State<_DiscoverFiltersScreen> {
     showOthersIfEmpty: _showOthers,
   ));
 
-  Widget _sectionCard({required Widget child}) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: BondCircleColors.border),
+  Widget _sectionCard({required Widget child}) => Material(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(color: BondCircleColors.border),
     ),
-    child: child,
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: child,
+    ),
   );
 
   @override

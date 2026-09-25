@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/bondcircle_theme.dart';
+import '../../auth/domain/auth_session.dart';
 import '../../circles/presentation/interest_circles_screen.dart';
+import '../data/profile_api_service.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
-  const ProfileSetupScreen({super.key, required this.initialName});
+  const ProfileSetupScreen({
+    super.key,
+    required this.initialName,
+    this.profileApiService,
+  });
 
   final String initialName;
+  final ProfileApiService? profileApiService;
 
   @override
   State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
@@ -50,6 +57,37 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    if (!AuthSession.instance.isAuthenticated) return;
+    final service = widget.profileApiService ?? ProfileApiService();
+    final profile = await service.getProfile();
+    if (profile != null && mounted) {
+      setState(() {
+        if (profile.gender.isNotEmpty) _gender = profile.gender;
+        if (profile.orientation.isNotEmpty) _sexuality = profile.orientation;
+        if (profile.connectionIntention.isNotEmpty) {
+          _datingIntention = profile.connectionIntention;
+        }
+        if (profile.relationshipStyle.isNotEmpty) {
+          _relationshipStyle = profile.relationshipStyle;
+        }
+        if (profile.interests.isNotEmpty) {
+          _interests.clear();
+          _interests.addAll(profile.interests);
+          for (final interest in profile.interests) {
+            final matchesOption = _interestOptions.any(
+              (item) => item.$1.toLowerCase() == interest.toLowerCase(),
+            );
+            if (!matchesOption && !_customInterests.contains(interest)) {
+              _customInterests.add(interest);
+            }
+          }
+        }
+      });
+    }
   }
 
   @override
@@ -116,6 +154,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           datingIntention: _datingIntention!,
           relationshipStyle: _relationshipStyle!,
           datingPreferences: _datingPreferences.toList(),
+          orientation: _sexuality ?? '',
+          profileApiService: widget.profileApiService,
         ),
       ),
     );
@@ -837,23 +877,23 @@ class _PrivacyToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(top: 4),
-    decoration: BoxDecoration(
+    child: Material(
       color: BondCircleColors.lavender.withValues(alpha: .55),
       borderRadius: BorderRadius.circular(18),
-    ),
-    child: SwitchListTile(
-      value: value,
-      onChanged: onChanged,
-      secondary: Icon(
-        value ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+      child: SwitchListTile(
+        value: value,
+        onChanged: onChanged,
+        secondary: Icon(
+          value ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+        ),
+        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: const Text('You can update this anytime.'),
       ),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: const Text('You can update this anytime.'),
     ),
   );
 }
 
-class ProfilePreviewScreen extends StatelessWidget {
+class ProfilePreviewScreen extends StatefulWidget {
   const ProfilePreviewScreen({
     super.key,
     required this.name,
@@ -865,6 +905,8 @@ class ProfilePreviewScreen extends StatelessWidget {
     required this.datingIntention,
     required this.relationshipStyle,
     required this.datingPreferences,
+    this.orientation = '',
+    this.profileApiService,
   });
 
   final String name;
@@ -876,6 +918,47 @@ class ProfilePreviewScreen extends StatelessWidget {
   final String datingIntention;
   final String relationshipStyle;
   final List<String> datingPreferences;
+  final String orientation;
+  final ProfileApiService? profileApiService;
+
+  @override
+  State<ProfilePreviewScreen> createState() => _ProfilePreviewScreenState();
+}
+
+class _ProfilePreviewScreenState extends State<ProfilePreviewScreen> {
+  bool _isSaving = false;
+
+  Future<void> _handleSave() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    try {
+      if (AuthSession.instance.isAuthenticated &&
+          widget.gender.isNotEmpty &&
+          widget.datingIntention.isNotEmpty &&
+          widget.relationshipStyle.isNotEmpty &&
+          widget.interests.isNotEmpty) {
+        final service = widget.profileApiService ?? ProfileApiService();
+        await service.saveProfile(
+          ProfileData(
+            gender: widget.gender,
+            orientation: widget.orientation,
+            connectionIntention: widget.datingIntention,
+            relationshipStyle: widget.relationshipStyle,
+            interests: widget.interests,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (_) => InterestCirclesScreen(displayName: widget.name),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -899,22 +982,22 @@ class ProfilePreviewScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          Text('$name, $age', style: Theme.of(context).textTheme.displaySmall),
+          Text('${widget.name}, ${widget.age}', style: Theme.of(context).textTheme.displaySmall),
           const SizedBox(height: 6),
           Row(
             children: [
               const Icon(Icons.location_on_outlined, size: 19),
               const SizedBox(width: 5),
-              Text(city),
+              Text(widget.city),
             ],
           ),
           const SizedBox(height: 20),
-          Text(bio, style: Theme.of(context).textTheme.bodyLarge),
+          Text(widget.bio, style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 24),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: interests.map((item) => Chip(label: Text(item))).toList(),
+            children: widget.interests.map((item) => Chip(label: Text(item))).toList(),
           ),
           const SizedBox(height: 24),
           Container(
@@ -926,21 +1009,21 @@ class ProfilePreviewScreen extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _PreviewDetail(Icons.badge_outlined, 'Identity', gender),
+                _PreviewDetail(Icons.badge_outlined, 'Identity', widget.gender),
                 _PreviewDetail(
                   Icons.explore_outlined,
                   'Looking for',
-                  datingIntention,
+                  widget.datingIntention,
                 ),
                 _PreviewDetail(
                   Icons.join_inner_rounded,
                   'Relationship style',
-                  relationshipStyle,
+                  widget.relationshipStyle,
                 ),
                 _PreviewDetail(
                   Icons.people_alt_outlined,
                   'Open to',
-                  datingPreferences.join(', '),
+                  widget.datingPreferences.join(', '),
                   last: true,
                 ),
               ],
@@ -949,12 +1032,17 @@ class ProfilePreviewScreen extends StatelessWidget {
           const SizedBox(height: 28),
           FilledButton(
             key: const Key('saveProfileButton'),
-            onPressed: () => Navigator.of(context).pushReplacement(
-              MaterialPageRoute<void>(
-                builder: (_) => InterestCirclesScreen(displayName: name),
-              ),
-            ),
-            child: const Text('Save and choose circles'),
+            onPressed: _isSaving ? null : _handleSave,
+            child: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text('Save and choose circles'),
           ),
         ],
       ),
