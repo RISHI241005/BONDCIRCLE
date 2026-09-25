@@ -3,6 +3,7 @@ package com.datingapp.chat.replycoach.service;
 import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
 import com.datingapp.chat.replycoach.model.ConversationContext;
 import com.datingapp.chat.replycoach.model.ConversationEnvironment;
+import com.datingapp.chat.replycoach.model.LatestMessageAnalysis;
 import com.datingapp.chat.replycoach.model.ReplyStrategy;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,18 @@ public class ReplyCandidateGenerator {
             UserWritingProfile styleProfile,
             List<String> rejectedTexts,
             int limit) {
+        return generateCandidates(context, env, styleProfile, rejectedTexts, limit, null, List.of(), 1);
+    }
+
+    public List<ReplySuggestionItem> generateCandidates(
+            ConversationContext context,
+            ConversationEnvironment env,
+            UserWritingProfile styleProfile,
+            List<String> rejectedTexts,
+            int limit,
+            LatestMessageAnalysis latest,
+            List<ReplyStrategy> plannedStrategies,
+            int generationNumber) {
 
         List<ReplySuggestionItem> candidates = new ArrayList<>();
         boolean isHinglish = "HINGLISH".equalsIgnoreCase(env.language()) || "MIXED".equalsIgnoreCase(env.language());
@@ -27,6 +40,12 @@ public class ReplyCandidateGenerator {
         boolean wantsEmoji = styleProfile != null && styleProfile.emojiUsage() == UserWritingProfile.EmojiUsage.FREQUENT;
         String emoji = wantsEmoji ? " 😊" : "";
         String laughEmoji = wantsEmoji ? " 😂" : "";
+
+        if (generationNumber > 1 && env != null
+                && env.stage() != ConversationEnvironment.Stage.ENDING
+                && env.direction() != ConversationEnvironment.Direction.CLOSING) {
+            addRefreshCandidates(candidates, env, latest, isHinglish, generationNumber);
+        }
 
         // 0. Long-term memory callback (if available)
         if (context != null && context.longTermMemories() != null && !context.longTermMemories().isEmpty()) {
@@ -467,5 +486,87 @@ public class ReplyCandidateGenerator {
         }
 
         return candidates;
+    }
+
+    private void addRefreshCandidates(
+            List<ReplySuggestionItem> candidates,
+            ConversationEnvironment env,
+            LatestMessageAnalysis latest,
+            boolean hinglish,
+            int generationNumber) {
+        String latestText = latest != null && latest.text() != null
+                ? latest.text().toLowerCase(java.util.Locale.ROOT) : "";
+        boolean studies = "Studies & Academics".equalsIgnoreCase(env.primaryTopic())
+                || latestText.matches(".*\\b(college|class|assignment|exam|presentation|project)\\b.*");
+        boolean emotional = latest != null && latest.emotionalSignal();
+        boolean planning = env.stage() == ConversationEnvironment.Stage.PLANNING
+                || latest != null && latest.intent() == com.datingapp.chat.replycoach.model.MessageIntelligence.Intent.INVITATION;
+
+        if (studies) {
+            if (hinglish && generationNumber % 2 == 0) {
+                add(candidates, "College really said free time cancel today 😂", "Studies", "Playful", ReplyStrategy.BANTER);
+                add(candidates, "Ab proper break banta hai — recovery plan kya hai?", "Studies", "Warm", ReplyStrategy.TOPIC_EXPANSION);
+                add(candidates, "Kis subject ne sabse zyada torture kiya? 😭", "Studies", "Curious", ReplyStrategy.CURIOUS);
+            } else if (hinglish) {
+                add(candidates, "Honestly main assignment number two ke baad disappear ho jata 😂", "Studies", "Playful", ReplyStrategy.PERSONAL);
+                add(candidates, "Kal bhi same scene hai ya finally thodi peace?", "Studies", "Thoughtful", ReplyStrategy.TOPIC_EXPANSION);
+                add(candidates, "At least surviving that deserves a reward 😭", "Studies", "Supportive", ReplyStrategy.SUPPORTIVE);
+            } else if (generationNumber % 2 == 0) {
+                add(candidates, "College really decided free time was cancelled today 😂", "Studies", "Playful", ReplyStrategy.BANTER);
+                add(candidates, "You deserve a proper break after that—what's the recovery plan?", "Studies", "Warm", ReplyStrategy.TOPIC_EXPANSION);
+                add(candidates, "Which subject caused the most damage? 😭", "Studies", "Curious", ReplyStrategy.CURIOUS);
+            } else {
+                add(candidates, "Honestly, assignment number two would've finished me 😂", "Studies", "Playful", ReplyStrategy.PERSONAL);
+                add(candidates, "Is tomorrow more of the same or do you finally get some peace?", "Studies", "Thoughtful", ReplyStrategy.TOPIC_EXPANSION);
+                add(candidates, "At least surviving that deserves a reward 😭", "Studies", "Supportive", ReplyStrategy.SUPPORTIVE);
+            }
+            return;
+        }
+
+        if (planning) {
+            if (hinglish) {
+                add(candidates, "Place tum choose karoge ya options bheju? 👀", "Plans", "Curious", ReplyStrategy.INVITATION);
+                add(candidates, "Pehle time lock karte hain, phir baaki scene easy hai 😂", "Plans", "Playful", ReplyStrategy.PLAN);
+                add(candidates, "Plan interesting lag raha hai—details bhejo 😄", "Plans", "Warm", ReplyStrategy.ACKNOWLEDGE);
+            } else {
+                add(candidates, "Are you choosing the place, or should I send options? 👀", "Plans", "Curious", ReplyStrategy.INVITATION);
+                add(candidates, "Let's lock the time first, then the rest is easy 😂", "Plans", "Playful", ReplyStrategy.PLAN);
+                add(candidates, "That plan sounds promising—send me the details 😄", "Plans", "Warm", ReplyStrategy.ACKNOWLEDGE);
+            }
+            return;
+        }
+
+        if (emotional) {
+            if (hinglish) {
+                add(candidates, "Yaar that sounds rough—thoda breathe karne ka time mila?", "Support", "Warm", ReplyStrategy.THOUGHTFUL);
+                add(candidates, "Aaj ka villain kaun tha phir? 😭", "Support", "Playful", ReplyStrategy.BANTER);
+                add(candidates, "Vent karna ho toh I'm listening, no pressure.", "Support", "Supportive", ReplyStrategy.SUPPORTIVE);
+            } else {
+                add(candidates, "That sounds rough—did you get any time to breathe?", "Support", "Warm", ReplyStrategy.THOUGHTFUL);
+                add(candidates, "So who was today's villain? 😭", "Support", "Playful", ReplyStrategy.BANTER);
+                add(candidates, "If you want to vent, I'm listening—no pressure.", "Support", "Supportive", ReplyStrategy.SUPPORTIVE);
+            }
+            return;
+        }
+
+        if (hinglish) {
+            add(candidates, "Okay wait, iska unexpected part kya tha? 👀", env.primaryTopic(), "Curious", ReplyStrategy.STORY_CONTINUATION);
+            add(candidates, "Ye story clearly abhi khatam nahi hui 😂", env.primaryTopic(), "Playful", ReplyStrategy.BANTER);
+            add(candidates, "Waise iske baad tumhara mood better hua ya aur chaos?", env.primaryTopic(), "Thoughtful", ReplyStrategy.TOPIC_EXPANSION);
+        } else {
+            add(candidates, "Okay wait, what was the most unexpected part? 👀", env.primaryTopic(), "Curious", ReplyStrategy.STORY_CONTINUATION);
+            add(candidates, "This story clearly isn't over yet 😂", env.primaryTopic(), "Playful", ReplyStrategy.BANTER);
+            add(candidates, "Did things calm down after that, or was there more chaos?", env.primaryTopic(), "Thoughtful", ReplyStrategy.TOPIC_EXPANSION);
+        }
+    }
+
+    private void add(
+            List<ReplySuggestionItem> candidates,
+            String text,
+            String topic,
+            String tone,
+            ReplyStrategy strategy) {
+        candidates.add(new ReplySuggestionItem(
+                UUID.randomUUID().toString(), text, topic, tone, strategy.name(), tone));
     }
 }

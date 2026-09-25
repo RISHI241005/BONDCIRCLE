@@ -4,6 +4,8 @@ import com.datingapp.chat.replycoach.model.ConversationAnalysis;
 import com.datingapp.chat.replycoach.model.ConversationContext;
 import com.datingapp.chat.replycoach.model.ConversationContext.ContextMessage;
 import com.datingapp.chat.replycoach.model.ConversationEnvironment;
+import com.datingapp.chat.replycoach.model.LatestMessageAnalysis;
+import com.datingapp.chat.replycoach.model.PartnerCommunicationProfile;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +19,17 @@ public class ReplyCoachPromptBuilder {
             ConversationEnvironment env,
             UserWritingProfile style,
             List<ReplyIntentPlanner.PlannedIntent> plannedIntents) {
+        return buildSystemPrompt(targetCount, env, style, plannedIntents, null, null, null);
+    }
+
+    public String buildSystemPrompt(
+            int targetCount,
+            ConversationEnvironment env,
+            UserWritingProfile style,
+            List<ReplyIntentPlanner.PlannedIntent> plannedIntents,
+            LatestMessageAnalysis latest,
+            PartnerCommunicationProfile partnerStyle,
+            SuggestionGenerationSession.Snapshot session) {
 
         StringBuilder sb = new StringBuilder();
         sb.append("You are BondCircle AI Reply Coach — an intelligent, empathetic, and perceptive conversation copilot sitting right beside the user.\n");
@@ -24,7 +37,16 @@ public class ReplyCoachPromptBuilder {
                 .append(targetCount).append(" natural, ready-to-send reply drafts that CURRENT_USER can choose from.\n\n");
 
         sb.append("CORE PRINCIPLES:\n");
-        sb.append("1. CONVERSATION FLOW: Understand who spoke last and what they asked or shared. The replies must directly continue this thread smoothly.\n");
+        sb.append("1. LATEST MESSAGE FIRST: The latest incoming OTHER_USER message is the strongest signal. Every reply must directly make sense beneath that exact message; older context only resolves references and prevents repetition.\n");
+
+        if (latest != null && latest.text() != null && !latest.text().isBlank()) {
+            sb.append("LATEST MESSAGE INTERPRETATION: intent=").append(latest.intent())
+                    .append(", topic=").append(latest.topic())
+                    .append(", emotion=").append(latest.emotion())
+                    .append(", tone=").append(latest.tone())
+                    .append(", opportunity=").append(latest.conversationOpportunity())
+                    .append(", expectedResponse=").append(latest.expectedResponseType()).append(".\n");
+        }
 
         if (env != null && env.hasUnansweredQuestion() && env.unansweredQuestionText() != null) {
             sb.append("2. ANSWER THE QUESTION: The other person explicitly asked: \"")
@@ -51,6 +73,17 @@ public class ReplyCoachPromptBuilder {
 
         if (style != null && style.negativeDirectives() != null && !style.negativeDirectives().isBlank()) {
             sb.append("6. NEGATIVE SIGNALS (USER HISTORICALLY DISLIKES): ").append(style.negativeDirectives()).append("\n");
+        }
+
+        if (partnerStyle != null && partnerStyle.promptDirectives() != null) {
+            sb.append("PARTNER COMMUNICATION STYLE: ").append(partnerStyle.promptDirectives()).append("\n");
+        }
+
+        if (session != null && session.generationNumber() > 1) {
+            sb.append("REFRESH GENERATION ").append(session.generationNumber())
+                    .append(": Previously attempted strategies were ")
+                    .append(session.previousStrategies())
+                    .append(". Use the newly planned strategies and produce different ideas, intent, structure, and meaning—not paraphrases.\n");
         }
 
         if (env != null && env.isDry()) {
@@ -82,7 +115,7 @@ public class ReplyCoachPromptBuilder {
         sb.append("  \"suggestions\": [\n");
         sb.append("    {\n");
         sb.append("      \"text\": \"The exact draft reply message for the user to send.\",\n");
-        sb.append("      \"strategy\": \"ANSWER | ASK_FOLLOWUP | CURIOUS | PLAYFUL | BANTER | EMPATHIZE | SUPPORTIVE | THOUGHTFUL | LIGHT_FLIRTING | RE_OPENER\",\n");
+        sb.append("      \"strategy\": \"ANSWER | ASK_FOLLOWUP | CURIOUS | PLAYFUL | BANTER | EMPATHIZE | SUPPORTIVE | THOUGHTFUL | LIGHT_FLIRTING | RE_OPENER | TOPIC_EXPANSION | TOPIC_SHIFT | TEASE | INVITATION | STORY_CONTINUATION | PERSONAL | PLAN\",\n");
         sb.append("      \"style\": \"Casual | Playful | Warm | Witty\",\n");
         sb.append("      \"topic\": \"Short topic\",\n");
         sb.append("      \"tone\": \"Playful | Warm | Curious\"\n");
@@ -124,8 +157,34 @@ public class ReplyCoachPromptBuilder {
             ConversationContext context,
             ConversationEnvironment env,
             List<String> rejectedTexts) {
+        return buildUserPrompt(context, env, rejectedTexts, null, null, null);
+    }
+
+    public String buildUserPrompt(
+            ConversationContext context,
+            ConversationEnvironment env,
+            List<String> rejectedTexts,
+            LatestMessageAnalysis latest,
+            PartnerCommunicationProfile partnerStyle,
+            SuggestionGenerationSession.Snapshot session) {
 
         StringBuilder sb = new StringBuilder();
+
+        if (latest != null && latest.text() != null && !latest.text().isBlank()) {
+            sb.append("=== PRIMARY REPLY TARGET: LATEST INCOMING MESSAGE ===\n");
+            sb.append("OTHER_USER: ").append(sanitize(latest.text())).append("\n");
+            sb.append("Intent: ").append(latest.intent())
+                    .append(" | Topic: ").append(latest.topic())
+                    .append(" | Emotion: ").append(latest.emotion())
+                    .append(" | Tone: ").append(latest.tone())
+                    .append(" | Language: ").append(latest.language()).append("\n");
+            sb.append("Question: ").append(latest.question())
+                    .append(" | Implicit question: ").append(latest.implicitQuestion())
+                    .append(" | Request: ").append(latest.request())
+                    .append(" | Opportunity: ").append(latest.conversationOpportunity()).append("\n");
+            sb.append("Every suggestion must respond naturally to this message.\n");
+            sb.append("=====================================================\n\n");
+        }
 
         if (context == null || context.isEmpty()) {
             sb.append("CONVERSATION STATUS: Fresh match / No prior messages.\n");
@@ -173,6 +232,13 @@ public class ReplyCoachPromptBuilder {
                 }
             }
             sb.append("Provide completely new angles and wording!\n");
+        }
+
+        if (session != null && session.generationNumber() > 1) {
+            sb.append("\nREFRESH SESSION:\n");
+            sb.append("Generation number: ").append(session.generationNumber()).append("\n");
+            sb.append("Already attempted strategies: ").append(session.previousStrategies()).append("\n");
+            sb.append("Previously shown suggestions are included above. Do not repeat their ideas, intent, structure, question type, or meaning.\n");
         }
 
         sb.append("\nGenerate the JSON reply suggestions now:");

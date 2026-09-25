@@ -40,6 +40,8 @@ public class ConversationIntelligenceService {
     private static final Pattern DISCLOSURE_PATTERN = Pattern.compile("\\b(what do you|how do you|tell me about|your favorite|your favourite|tumhara|tumhari|aapka|aapki)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern URGENCY_PATTERN = Pattern.compile("\\b(urgent|asap|right now|jaldi|immediately|emergency)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern UNCERTAINTY_PATTERN = Pattern.compile("\\b(maybe|perhaps|not sure|i guess|shayad|pata nahi|idk)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern REQUEST_PATTERN = Pattern.compile("\\b(can you|could you|would you|please|pls|send me|tell me|bata do|bhej do|kar sakte)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EXPERIENCE_PATTERN = Pattern.compile("\\b(i |i'm|i am|i've|my |mera|meri|mujhe|aaj|today|yesterday|finally|just got|just finished)\\b", Pattern.CASE_INSENSITIVE);
 
     private final LanguageIntelligenceService languageIntelligenceService;
 
@@ -387,11 +389,13 @@ public class ConversationIntelligenceService {
 
     private MessageIntelligence.Intent detectMessageIntent(String content, MessageIntelligence.Sentiment sentiment, boolean question) {
         if (INVITATION_PATTERN.matcher(content).find()) return MessageIntelligence.Intent.INVITATION;
+        if (REQUEST_PATTERN.matcher(content).find()) return MessageIntelligence.Intent.REQUEST;
         if (FLIRTING_PATTERN.matcher(content).find()) return MessageIntelligence.Intent.FLIRTING;
         if (sentiment == MessageIntelligence.Sentiment.STRESSED || sentiment == MessageIntelligence.Sentiment.NEGATIVE) return MessageIntelligence.Intent.EMOTIONAL_VENT;
         if (COMPLIMENT_PATTERN.matcher(content).find()) return MessageIntelligence.Intent.COMPLIMENT;
         if (JOKE_PATTERN.matcher(content).find()) return MessageIntelligence.Intent.JOKE;
         if (question) return MessageIntelligence.Intent.QUESTION;
+        if (EXPERIENCE_PATTERN.matcher(content).find()) return MessageIntelligence.Intent.SHARING_EXPERIENCE;
         return MessageIntelligence.Intent.STATEMENT;
     }
 

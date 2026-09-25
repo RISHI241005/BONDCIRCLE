@@ -2,6 +2,7 @@ package com.datingapp.chat.replycoach.service;
 
 import com.datingapp.chat.replycoach.entity.FeedbackAction;
 import com.datingapp.chat.replycoach.model.ConversationContext.ContextMessage;
+import com.datingapp.chat.replycoach.model.PartnerCommunicationProfile;
 import com.datingapp.chat.replycoach.model.ReplyStrategy;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import com.datingapp.chat.replycoach.model.UserWritingProfile.EmojiUsage;
@@ -218,6 +219,87 @@ public class UserStyleEngine {
                 preferredStrategies,
                 rejectedStrategies,
                 negativeDirectives.toString().trim()
+        );
+    }
+
+    /**
+     * Learns only observable partner communication traits. Unlike the current
+     * user's profile this deliberately does not read the user's feedback.
+     */
+    public PartnerCommunicationProfile analyzePartnerStyle(
+            List<ContextMessage> messages,
+            String conversationLanguage) {
+        List<ContextMessage> partnerMessages = messages == null ? List.of() : messages.stream()
+                .filter(message -> !message.isCurrentUser())
+                .filter(message -> message.content() != null && !message.content().isBlank())
+                .toList();
+        if (partnerMessages.isEmpty()) {
+            return PartnerCommunicationProfile.defaults(conversationLanguage);
+        }
+
+        double averageLength = partnerMessages.stream().mapToInt(message -> message.content().length())
+                .average().orElse(35.0);
+        LengthPreference length = averageLength <= 24 ? LengthPreference.SHORT
+                : averageLength >= 75 ? LengthPreference.LONG : LengthPreference.MEDIUM;
+
+        long emojiMessages = partnerMessages.stream()
+                .filter(message -> message.content().codePoints().anyMatch(Character::isEmoji))
+                .count();
+        double emojiRatio = (double) emojiMessages / partnerMessages.size();
+        EmojiUsage partnerEmojiUsage = emojiRatio == 0.0 ? EmojiUsage.NONE
+                : emojiRatio >= 0.35 ? EmojiUsage.FREQUENT : EmojiUsage.OCCASIONAL;
+
+        Set<String> partnerSlang = new HashSet<>();
+        int hinglishTokens = 0;
+        int totalTokens = 0;
+        long humorousMessages = 0;
+        long enthusiasticMessages = 0;
+        long questions = 0;
+        long punctuated = 0;
+
+        for (ContextMessage message : partnerMessages) {
+            String content = message.content();
+            String lower = content.toLowerCase(Locale.ROOT);
+            if (lower.contains("😂") || lower.contains("🤣") || lower.matches(".*\\b(lol|haha|lmao|mazak)\\b.*")) humorousMessages++;
+            if (content.contains("!") || lower.matches(".*\\b(omg|wow|brooo+|no way|crazy|mast)\\b.*")) enthusiasticMessages++;
+            if (content.contains("?") || lower.matches(".*\\b(what|why|how|when|where|kya|kyun|kaise|kab|kaha)\\b.*")) questions++;
+            if (content.endsWith(".") || content.endsWith("!") || content.endsWith("?")) punctuated++;
+
+            for (String token : content.split("\\s+")) {
+                String clean = token.replaceAll("[^a-zA-Z]", "").toLowerCase(Locale.ROOT);
+                if (clean.isBlank()) continue;
+                totalTokens++;
+                if (SLANG_TOKEN_PATTERN.matcher(clean).matches()) partnerSlang.add(clean);
+                if (Set.of("haan", "acha", "accha", "yaar", "bhai", "kya", "kyun", "kaise", "nahi", "hai", "kal", "aaj", "mujhe", "tum").contains(clean)) {
+                    hinglishTokens++;
+                }
+            }
+        }
+
+        String language = totalTokens > 0 && (double) hinglishTokens / totalTokens >= 0.12
+                ? "HINGLISH"
+                : (conversationLanguage == null ? "ENGLISH" : conversationLanguage);
+        Formality partnerFormality = (double) punctuated / partnerMessages.size() >= 0.7
+                ? Formality.PUNCTUATED : Formality.CASUAL;
+        double humor = (double) humorousMessages / partnerMessages.size();
+        double enthusiasm = (double) enthusiasticMessages / partnerMessages.size();
+        double questionFrequency = (double) questions / partnerMessages.size();
+
+        String directives = "Mirror partner energy: " + length.name().toLowerCase(Locale.ROOT)
+                + " messages, " + partnerEmojiUsage.name().toLowerCase(Locale.ROOT) + " emoji use"
+                + (partnerSlang.isEmpty() ? "" : ", slang such as " + String.join(", ", partnerSlang))
+                + ". Keep the current user's own voice; do not copy quirks mechanically.";
+
+        return new PartnerCommunicationProfile(
+                length,
+                partnerEmojiUsage,
+                language,
+                partnerFormality,
+                Set.copyOf(partnerSlang),
+                humor,
+                enthusiasm,
+                questionFrequency,
+                directives
         );
     }
 }

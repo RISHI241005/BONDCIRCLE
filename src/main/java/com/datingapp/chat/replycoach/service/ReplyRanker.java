@@ -3,6 +3,8 @@ package com.datingapp.chat.replycoach.service;
 import com.datingapp.chat.config.ReplyRankingProperties;
 import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
 import com.datingapp.chat.replycoach.model.ConversationEnvironment;
+import com.datingapp.chat.replycoach.model.LatestMessageAnalysis;
+import com.datingapp.chat.replycoach.model.PartnerCommunicationProfile;
 import com.datingapp.chat.replycoach.model.ReplyStrategy;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,10 +22,16 @@ import java.util.Set;
 public class ReplyRanker {
 
     private final ReplyRankingProperties weights;
+    private final ReplySemanticSimilarity semanticSimilarity;
 
     @Autowired
-    public ReplyRanker(ReplyRankingProperties weights) {
+    public ReplyRanker(ReplyRankingProperties weights, ReplySemanticSimilarity semanticSimilarity) {
         this.weights = weights != null ? weights : new ReplyRankingProperties();
+        this.semanticSimilarity = semanticSimilarity != null ? semanticSimilarity : new ReplySemanticSimilarity();
+    }
+
+    public ReplyRanker(ReplyRankingProperties weights) {
+        this(weights, new ReplySemanticSimilarity());
     }
 
     public ReplyRanker() {
@@ -39,6 +47,19 @@ public class ReplyRanker {
             List<ReplyStrategy> plannedStrategies,
             List<String> rejectedTexts,
             int targetLimit) {
+        return rankAndFilter(candidates, env, styleProfile, null, null,
+                plannedStrategies, rejectedTexts, targetLimit);
+    }
+
+    public List<ReplySuggestionItem> rankAndFilter(
+            List<ReplySuggestionItem> candidates,
+            ConversationEnvironment env,
+            UserWritingProfile styleProfile,
+            PartnerCommunicationProfile partnerStyle,
+            LatestMessageAnalysis latest,
+            List<ReplyStrategy> plannedStrategies,
+            List<String> rejectedTexts,
+            int targetLimit) {
 
         if (candidates == null || candidates.isEmpty()) {
             return Collections.emptyList();
@@ -49,7 +70,8 @@ public class ReplyRanker {
         // Score each candidate
         List<ScoredReply> scoredList = new ArrayList<>();
         for (ReplySuggestionItem item : candidates) {
-            double score = scoreCandidate(item, env, styleProfile, plannedStrategies, rejectedTexts);
+            double score = scoreCandidate(item, env, styleProfile, partnerStyle, latest,
+                    plannedStrategies, rejectedTexts);
             scoredList.add(new ScoredReply(item, score));
         }
 
@@ -59,23 +81,17 @@ public class ReplyRanker {
         // Diversity selection
         List<ReplySuggestionItem> selected = new ArrayList<>();
         Set<String> selectedStrategies = new HashSet<>();
-        List<Set<String>> selectedWordSets = new ArrayList<>();
+        int questionCount = 0;
 
         for (ScoredReply sr : scoredList) {
             ReplySuggestionItem candidate = sr.item();
             String text = candidate.getText();
-            Set<String> words = tokenize(text);
             String strat = candidate.getStrategy() != null ? candidate.getStrategy().toUpperCase(Locale.ROOT) : "";
 
-            // Check lexical similarity with already selected replies (Jaccard threshold 0.5)
-            boolean isTooSimilar = false;
-            for (Set<String> existing : selectedWordSets) {
-                if (jaccardSimilarity(words, existing) > 0.45) {
-                    isTooSimilar = true;
-                    break;
-                }
-            }
+            boolean isTooSimilar = selected.stream()
+                    .anyMatch(existing -> semanticSimilarity.areSemanticallySimilar(candidate, existing));
             if (isTooSimilar) continue;
+            if (text.contains("?") && questionCount >= 2) continue;
 
             // Strategy diversity preference: prefer different strategies unless candidates run out
             if (!strat.isEmpty() && selectedStrategies.contains(strat) && selected.size() < maxResults) {
@@ -93,7 +109,7 @@ public class ReplyRanker {
 
             selected.add(candidate);
             if (!strat.isEmpty()) selectedStrategies.add(strat);
-            selectedWordSets.add(words);
+            if (text.contains("?")) questionCount++;
 
             if (selected.size() >= maxResults) {
                 break;
@@ -101,6 +117,15 @@ public class ReplyRanker {
         }
 
         // If strict diversity pruned too many, backfill remaining best candidates
+        if (selected.size() < maxResults) {
+            for (ScoredReply sr : scoredList) {
+                if (!selected.contains(sr.item()) && !sr.item().getText().contains("?")
+                        && selected.stream().noneMatch(existing -> semanticSimilarity.areSemanticallySimilar(sr.item(), existing))) {
+                    selected.add(sr.item());
+                    if (selected.size() >= maxResults) break;
+                }
+            }
+        }
         if (selected.size() < maxResults) {
             for (ScoredReply sr : scoredList) {
                 if (!selected.contains(sr.item())) {
@@ -119,12 +144,28 @@ public class ReplyRanker {
             UserWritingProfile styleProfile,
             List<ReplyStrategy> plannedStrategies,
             List<String> rejectedTexts) {
+        return scoreCandidate(item, env, styleProfile, null, null, plannedStrategies, rejectedTexts);
+    }
+
+    public double scoreCandidate(
+            ReplySuggestionItem item,
+            ConversationEnvironment env,
+            UserWritingProfile styleProfile,
+            PartnerCommunicationProfile partnerStyle,
+            LatestMessageAnalysis latest,
+            List<ReplyStrategy> plannedStrategies,
+            List<String> rejectedTexts) {
 
         if (item == null || item.getText() == null) return 0.0;
         String text = item.getText();
 
-        double contextRelevance = calculateRelevance(text, env);
+        double conversationRelevance = calculateRelevance(text, env);
+        double contextRelevance = latest == null ? conversationRelevance
+                : (0.35 * conversationRelevance) + (0.65 * calculateLatestMessageRelevance(item, latest));
         double userStyleMatch = calculateStyleMatch(text, styleProfile);
+        if (partnerStyle != null) {
+            userStyleMatch = (0.75 * userStyleMatch) + (0.25 * calculatePartnerStyleMatch(text, partnerStyle));
+        }
         double languageMatch = calculateLanguageMatch(text, env != null ? env.language() : "ENGLISH");
         double toneMatch = calculateToneMatch(item.getTone(), env);
         double strategyFit = calculateStrategyFit(item.getStrategy(), plannedStrategies);
@@ -163,6 +204,46 @@ public class ReplyRanker {
                     break;
                 }
             }
+        }
+        return Math.min(1.0, score);
+    }
+
+    private double calculateLatestMessageRelevance(ReplySuggestionItem item, LatestMessageAnalysis latest) {
+        if (latest == null || latest.text() == null || latest.text().isBlank()) return 0.5;
+        double score = 0.35;
+        String strategy = item.getStrategy() == null ? "" : item.getStrategy().toUpperCase(Locale.ROOT);
+        if ((latest.question() || latest.implicitQuestion() || latest.request())
+                && (strategy.equals("ANSWER") || strategy.equals("PLAN") || strategy.equals("INVITATION"))) {
+            score += 0.4;
+        }
+        if (latest.emotionalSignal() && Set.of("EMPATHIZE", "SUPPORTIVE", "THOUGHTFUL", "ACKNOWLEDGE").contains(strategy)) {
+            score += 0.4;
+        }
+        if (latest.humor() > 0.55 && Set.of("PLAYFUL", "BANTER", "TEASE").contains(strategy)) {
+            score += 0.3;
+        }
+        if (latest.flirting() > 0.55 && Set.of("LIGHT_FLIRTING", "BANTER", "TEASE").contains(strategy)) {
+            score += 0.3;
+        }
+        String replyTopic = item.getTopic() == null ? "" : item.getTopic().toLowerCase(Locale.ROOT);
+        String latestTopic = latest.topic() == null ? "" : latest.topic().toLowerCase(Locale.ROOT);
+        if (!replyTopic.isBlank() && !latestTopic.isBlank()
+                && (replyTopic.contains(latestTopic) || latestTopic.contains(replyTopic))) {
+            score += 0.2;
+        }
+        return Math.min(1.0, score);
+    }
+
+    private double calculatePartnerStyleMatch(String text, PartnerCommunicationProfile profile) {
+        double score = 0.55;
+        if (profile.length() == UserWritingProfile.LengthPreference.SHORT && text.length() <= 45) score += 0.2;
+        if (profile.length() == UserWritingProfile.LengthPreference.LONG && text.length() >= 55) score += 0.15;
+        boolean emoji = text.codePoints().anyMatch(Character::isEmoji);
+        if (profile.emojiUsage() == UserWritingProfile.EmojiUsage.FREQUENT && emoji) score += 0.15;
+        if (profile.emojiUsage() == UserWritingProfile.EmojiUsage.NONE && !emoji) score += 0.1;
+        if (profile.slangTokens() != null) {
+            String lower = text.toLowerCase(Locale.ROOT);
+            if (profile.slangTokens().stream().anyMatch(lower::contains)) score += 0.1;
         }
         return Math.min(1.0, score);
     }
@@ -234,7 +315,8 @@ public class ReplyRanker {
         if (rejectedTexts == null || rejectedTexts.isEmpty()) return 1.0;
         String clean = text.trim().toLowerCase(Locale.ROOT);
         for (String rej : rejectedTexts) {
-            if (rej != null && clean.contains(rej.trim().toLowerCase(Locale.ROOT))) {
+            if (rej != null && (clean.contains(rej.trim().toLowerCase(Locale.ROOT))
+                    || semanticSimilarity.areSemanticallySimilar(text, rej))) {
                 return 0.0;
             }
         }

@@ -17,5 +17,7 @@ public enum ReplyStrategy {
     ACKNOWLEDGE,
     TEASE,
     INVITATION,
-    STORY_CONTINUATION
+    STORY_CONTINUATION,
+    PERSONAL,
+    PLAN
 }

@@ -1,6 +1,7 @@
 package com.datingapp.chat.replycoach.service;
 
 import com.datingapp.chat.replycoach.model.ConversationContext.ContextMessage;
+import com.datingapp.chat.replycoach.model.PartnerCommunicationProfile;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import com.datingapp.chat.replycoach.repository.AiReplyFeedbackRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,5 +63,23 @@ class UserStyleEngineTest {
         UserWritingProfile profile = engine.analyzeStyle(101L, messages, "ENGLISH");
         assertThat(profile.language()).isEqualTo("ENGLISH");
         assertThat(profile.promptDirectives()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("Learns the partner's communication style independently")
+    void testAnalyzesPartnerStyle() {
+        List<ContextMessage> messages = List.of(
+                new ContextMessage("1", true, "What happened?", Instant.now().minusSeconds(30)),
+                new ContextMessage("2", false, "brooooo 😂😂 no wayyy", Instant.now().minusSeconds(20)),
+                new ContextMessage("3", false, "haan yaar seriously 😂", Instant.now().minusSeconds(10))
+        );
+
+        PartnerCommunicationProfile profile = engine.analyzePartnerStyle(messages, "MIXED");
+
+        assertThat(profile.length()).isEqualTo(UserWritingProfile.LengthPreference.SHORT);
+        assertThat(profile.emojiUsage()).isEqualTo(UserWritingProfile.EmojiUsage.FREQUENT);
+        assertThat(profile.language()).isEqualTo("HINGLISH");
+        assertThat(profile.slangTokens()).contains("yaar");
+        assertThat(profile.humorLevel()).isGreaterThan(0.5);
     }
 }

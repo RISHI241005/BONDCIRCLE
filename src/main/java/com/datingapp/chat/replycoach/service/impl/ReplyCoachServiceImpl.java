@@ -18,6 +18,9 @@ import com.datingapp.chat.replycoach.entity.AiReplyFeedback;
 import com.datingapp.chat.replycoach.entity.FeedbackAction;
 import com.datingapp.chat.replycoach.model.ConversationContext;
 import com.datingapp.chat.replycoach.model.ConversationEnvironment;
+import com.datingapp.chat.replycoach.model.LatestMessageAnalysis;
+import com.datingapp.chat.replycoach.model.MessageIntelligence;
+import com.datingapp.chat.replycoach.model.PartnerCommunicationProfile;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import com.datingapp.chat.replycoach.provider.AIReplyProvider;
 import com.datingapp.chat.replycoach.repository.AiReplyFeedbackRepository;
@@ -25,6 +28,7 @@ import com.datingapp.chat.replycoach.service.AiReplyFeedbackRecorder;
 import com.datingapp.chat.replycoach.service.ConversationIntelligenceService;
 import com.datingapp.chat.replycoach.service.ConversationMemoryExtractor;
 import com.datingapp.chat.replycoach.service.LanguageIntelligenceService;
+import com.datingapp.chat.replycoach.service.LatestMessageAnalyzer;
 import com.datingapp.chat.replycoach.service.ReplyCandidateGenerator;
 import com.datingapp.chat.replycoach.service.ReplyCoachQualityFilter;
 import com.datingapp.chat.replycoach.service.ReplyCoachRateLimiter;
@@ -32,6 +36,7 @@ import com.datingapp.chat.replycoach.service.ReplyCoachService;
 import com.datingapp.chat.replycoach.service.ReplyIntentPlanner;
 import com.datingapp.chat.replycoach.service.ReplyRanker;
 import com.datingapp.chat.replycoach.service.UserStyleEngine;
+import com.datingapp.chat.replycoach.service.SuggestionGenerationSession;
 import com.datingapp.chat.security.User;
 import com.datingapp.chat.security.UserRepository;
 import org.slf4j.Logger;
@@ -69,6 +74,8 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
     private final ReplyIntentPlanner replyIntentPlanner;
     private final ReplyCandidateGenerator candidateGenerator;
     private final ReplyRanker replyRanker;
+    private final LatestMessageAnalyzer latestMessageAnalyzer;
+    private final SuggestionGenerationSession generationSession;
 
     @Autowired
     public ReplyCoachServiceImpl(
@@ -87,7 +94,9 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
             ConversationMemoryExtractor memoryExtractor,
             ReplyIntentPlanner replyIntentPlanner,
             ReplyCandidateGenerator candidateGenerator,
-            ReplyRanker replyRanker) {
+            ReplyRanker replyRanker,
+            LatestMessageAnalyzer latestMessageAnalyzer,
+            SuggestionGenerationSession generationSession) {
         this.conversationRepository = conversationRepository;
         this.participantRepository = participantRepository;
         this.messageRepository = messageRepository;
@@ -104,6 +113,8 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
         this.replyIntentPlanner = replyIntentPlanner != null ? replyIntentPlanner : new ReplyIntentPlanner();
         this.candidateGenerator = candidateGenerator != null ? candidateGenerator : new ReplyCandidateGenerator();
         this.replyRanker = replyRanker != null ? replyRanker : new ReplyRanker();
+        this.latestMessageAnalyzer = latestMessageAnalyzer != null ? latestMessageAnalyzer : new LatestMessageAnalyzer();
+        this.generationSession = generationSession != null ? generationSession : new SuggestionGenerationSession();
     }
 
     public ReplyCoachServiceImpl(
@@ -123,7 +134,8 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
                 feedbackRepository, aiReplyProvider, feedbackRecorder,
                 conversationIntelligenceService, userStyleEngine, qualityFilter, rateLimiter,
                 new ConversationMemoryExtractor(), new ReplyIntentPlanner(),
-                new ReplyCandidateGenerator(), new ReplyRanker());
+                new ReplyCandidateGenerator(), new ReplyRanker(),
+                new LatestMessageAnalyzer(), new SuggestionGenerationSession());
     }
 
     public ReplyCoachServiceImpl(
@@ -140,7 +152,8 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
                 new ConversationIntelligenceService(), new UserStyleEngine(feedbackRepository),
                 new ReplyCoachQualityFilter(), new ReplyCoachRateLimiter(),
                 new ConversationMemoryExtractor(), new ReplyIntentPlanner(),
-                new ReplyCandidateGenerator(), new ReplyRanker());
+                new ReplyCandidateGenerator(), new ReplyRanker(),
+                new LatestMessageAnalyzer(), new SuggestionGenerationSession());
     }
 
     public ReplyCoachServiceImpl(
@@ -156,13 +169,14 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
                 new ConversationIntelligenceService(), new UserStyleEngine(feedbackRepository),
                 new ReplyCoachQualityFilter(), new ReplyCoachRateLimiter(),
                 new ConversationMemoryExtractor(), new ReplyIntentPlanner(),
-                new ReplyCandidateGenerator(), new ReplyRanker());
+                new ReplyCandidateGenerator(), new ReplyRanker(),
+                new LatestMessageAnalyzer(), new SuggestionGenerationSession());
     }
 
     @Override
     @Transactional(readOnly = true)
     public ReplySuggestionResponse getReplySuggestions(String conversationId, Long userId, int limit) {
-        return generateInternal(conversationId, userId, Collections.emptyList(), Collections.emptyList(), limit);
+        return generateInternal(conversationId, userId, Collections.emptyList(), Collections.emptyList(), limit, false);
     }
 
     @Override
@@ -173,7 +187,7 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
             List<String> rejectedSuggestionIds,
             List<String> rejectedTexts,
             int limit) {
-        return generateInternal(conversationId, userId, rejectedSuggestionIds, rejectedTexts, limit);
+        return generateInternal(conversationId, userId, rejectedSuggestionIds, rejectedTexts, limit, true);
     }
 
     @Override
@@ -194,6 +208,8 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
                 request.getSuggestionText(),
                 request.getAction()
         );
+        generationSession.recordFeedback(
+                userId, request.getConversationId(), request.getSuggestionText(), request.getAction());
         log.debug("Recorded AI Reply Coach feedback: user={}, action={}, suggestionId={}",
                 userId, request.getAction(), request.getSuggestionId());
     }
@@ -203,7 +219,8 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
             Long userId,
             List<String> rejectedIds,
             List<String> rejectedTextsParam,
-            int requestedLimit) {
+            int requestedLimit,
+            boolean regeneration) {
 
         int limit = Math.max(1, Math.min(requestedLimit, 3));
 
@@ -285,19 +302,41 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
         // 5. Run Conversation Intelligence Environment Analysis & User Style Engine
         ConversationEnvironment env = conversationIntelligenceService.analyzeEnvironment(context);
         UserWritingProfile styleProfile = userStyleEngine.analyzeStyle(userId, historyMessages, env.language());
+        PartnerCommunicationProfile partnerStyle = userStyleEngine.analyzePartnerStyle(historyMessages, env.language());
+        List<MessageIntelligence> messageSignals = conversationIntelligenceService.analyzeMessages(context);
+        LatestMessageAnalysis latest = latestMessageAnalyzer.analyze(context, messageSignals, env);
+        String latestMessageId = context.getLastMessage() != null
+                ? (context.getLastMessage().publicId() != null
+                ? context.getLastMessage().publicId() : String.valueOf(context.getLastMessage().id()))
+                : null;
+        SuggestionGenerationSession.Snapshot session = generationSession.begin(
+                userId, conversationId, latestMessageId, regeneration);
 
         // 6. Plan Reply Intents
-        ReplyIntentPlanner.ReplyIntentPlan intentPlan = replyIntentPlanner.planIntents(env, styleProfile);
+        ReplyIntentPlanner.ReplyIntentPlan intentPlan = replyIntentPlanner.planIntents(
+                env, styleProfile, latest, session.previousStrategies(), session.generationNumber());
 
         // 7. Compile rejected texts list
         List<String> combinedRejectedTexts = new ArrayList<>();
         if (rejectedTextsParam != null) {
             combinedRejectedTexts.addAll(rejectedTextsParam);
+            generationSession.recordRejected(userId, conversationId, rejectedTextsParam);
+        }
+        for (String previous : session.previousSuggestionTexts()) {
+            if (previous != null && !previous.isBlank() && !combinedRejectedTexts.contains(previous)) {
+                combinedRejectedTexts.add(previous);
+            }
+        }
+        for (String rejected : session.rejectedSuggestions()) {
+            if (rejected != null && !rejected.isBlank() && !combinedRejectedTexts.contains(rejected)) {
+                combinedRejectedTexts.add(rejected);
+            }
         }
         if (rejectedIds != null && !rejectedIds.isEmpty()) {
             try {
                 List<String> textsFromIds = feedbackRepository.findSuggestionTextsByIds(rejectedIds);
                 if (textsFromIds != null) {
+                    generationSession.recordRejected(userId, conversationId, textsFromIds);
                     for (String t : textsFromIds) {
                         if (t != null && !t.isBlank() && !combinedRejectedTexts.contains(t)) {
                             combinedRejectedTexts.add(t);
@@ -308,7 +347,6 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
                 log.debug("Could not resolve rejected suggestion texts by IDs: {}", ex.getMessage());
             }
         }
-
         // 8. Call AI Reply Provider
         Optional<AIReplyProvider.GenerationResult> aiResult = Optional.empty();
 
@@ -320,8 +358,12 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
                     styleProfile,
                     intentPlan.intents(),
                     combinedRejectedTexts,
-                    limit
+                    limit,
+                    latest,
+                    partnerStyle,
+                    session
             );
+            if (aiResult == null) aiResult = Optional.empty();
         } catch (Exception ex) {
             log.debug("Advanced generation call threw: {}", ex.getMessage());
         }
@@ -332,7 +374,8 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
         List<ReplySuggestionItem> candidatePool = new ArrayList<>();
         aiResult.ifPresent(result -> candidatePool.addAll(result.suggestions()));
         candidatePool.addAll(candidateGenerator.generateCandidates(
-                context, env, styleProfile, combinedRejectedTexts, limit));
+                context, env, styleProfile, combinedRejectedTexts, limit,
+                latest, intentPlan.getStrategies(), session.generationNumber()));
 
         List<ReplySuggestionItem> safeCandidates = qualityFilter.filter(
                 candidatePool, combinedRejectedTexts, context, Math.min(12, candidatePool.size()));
@@ -340,6 +383,8 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
                 safeCandidates,
                 env,
                 styleProfile,
+                partnerStyle,
+                latest,
                 intentPlan.getStrategies(),
                 combinedRejectedTexts,
                 limit
@@ -351,6 +396,7 @@ public class ReplyCoachServiceImpl implements ReplyCoachService {
 
         // Auto-record SHOWN feedback
         recordShownFeedbackAsync(userId, conversationId, finalSuggestions);
+        generationSession.recordGeneration(userId, conversationId, latestMessageId, finalSuggestions);
 
         String generationId = "gen_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         return new ReplySuggestionResponse(

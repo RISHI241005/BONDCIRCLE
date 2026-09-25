@@ -1,6 +1,7 @@
 package com.datingapp.chat.replycoach.service;
 
 import com.datingapp.chat.replycoach.model.ConversationEnvironment;
+import com.datingapp.chat.replycoach.model.LatestMessageAnalysis;
 import com.datingapp.chat.replycoach.model.ReplyStrategy;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import org.springframework.stereotype.Service;
@@ -127,6 +128,93 @@ public class ReplyIntentPlanner {
         ensureThreeDistinct(selected, planned, rejectedStrategies);
 
         return new ReplyIntentPlan(planned);
+    }
+
+    /**
+     * Refresh-aware planning. Mandatory actions (answering a question or
+     * respecting a close) remain, while the other slots move to conversational
+     * angles that have not already been shown in this latest-message session.
+     */
+    public ReplyIntentPlan planIntents(
+            ConversationEnvironment env,
+            UserWritingProfile styleProfile,
+            LatestMessageAnalysis latest,
+            Set<ReplyStrategy> attemptedStrategies,
+            int generationNumber) {
+        ReplyIntentPlan initial = planIntents(env, styleProfile);
+        if (generationNumber <= 1 || attemptedStrategies == null || attemptedStrategies.isEmpty()) {
+            return initial;
+        }
+
+        Set<ReplyStrategy> rejectedStrategies = styleProfile != null && styleProfile.rejectedStrategies() != null
+                ? styleProfile.rejectedStrategies() : Set.of();
+        Set<ReplyStrategy> selected = new LinkedHashSet<>();
+        List<PlannedIntent> planned = new ArrayList<>();
+
+        if (env != null && (env.hasUnansweredQuestion()
+                || latest != null && (latest.question() || latest.implicitQuestion() || latest.request()))) {
+            addStrategy(selected, planned, ReplyStrategy.ANSWER,
+                    "Directly answer the latest incoming question without inventing unknown user facts.", rejectedStrategies);
+        } else if (env != null && (env.stage() == ConversationEnvironment.Stage.ENDING
+                || env.direction() == ConversationEnvironment.Direction.CLOSING)) {
+            addStrategy(selected, planned, ReplyStrategy.ACKNOWLEDGE,
+                    "Respect the other person's conversational close.", rejectedStrategies);
+        }
+
+        for (ReplyStrategy strategy : refreshOrder(env, latest, generationNumber)) {
+            if (planned.size() >= 3) break;
+            if (!attemptedStrategies.contains(strategy)) {
+                addStrategy(selected, planned, strategy,
+                        "Explore a new conversational angle for refresh generation " + generationNumber + ".",
+                        rejectedStrategies);
+            }
+        }
+
+        for (PlannedIntent intent : initial.intents()) {
+            if (planned.size() >= 3) break;
+            if (!attemptedStrategies.contains(intent.strategy())) {
+                addStrategy(selected, planned, intent.strategy(), intent.rationale(), rejectedStrategies);
+            }
+        }
+
+        ensureThreeDistinct(selected, planned, rejectedStrategies);
+        return new ReplyIntentPlan(planned);
+    }
+
+    private List<ReplyStrategy> refreshOrder(
+            ConversationEnvironment env,
+            LatestMessageAnalysis latest,
+            int generationNumber) {
+        boolean emotional = latest != null && latest.emotionalSignal();
+        boolean playful = latest != null && (latest.humor() > 0.55 || "PLAYFUL".equals(latest.tone()));
+        boolean flirty = latest != null && latest.flirting() > 0.55;
+
+        if (env != null && (env.stage() == ConversationEnvironment.Stage.ENDING
+                || env.direction() == ConversationEnvironment.Direction.CLOSING)) {
+            return List.of(ReplyStrategy.SUPPORTIVE, ReplyStrategy.PLAYFUL, ReplyStrategy.THOUGHTFUL);
+        }
+        if (emotional) {
+            return generationNumber % 2 == 0
+                    ? List.of(ReplyStrategy.THOUGHTFUL, ReplyStrategy.TOPIC_EXPANSION, ReplyStrategy.SUPPORTIVE, ReplyStrategy.CURIOUS)
+                    : List.of(ReplyStrategy.EMPATHIZE, ReplyStrategy.PERSONAL, ReplyStrategy.ACKNOWLEDGE, ReplyStrategy.CURIOUS);
+        }
+        if (flirty) {
+            return List.of(ReplyStrategy.TEASE, ReplyStrategy.BANTER, ReplyStrategy.PERSONAL,
+                    ReplyStrategy.LIGHT_FLIRTING, ReplyStrategy.TOPIC_EXPANSION);
+        }
+        if (playful) {
+            return List.of(ReplyStrategy.BANTER, ReplyStrategy.STORY_CONTINUATION, ReplyStrategy.TEASE,
+                    ReplyStrategy.TOPIC_EXPANSION, ReplyStrategy.PERSONAL);
+        }
+        if (env != null && env.isDry()) {
+            return List.of(ReplyStrategy.BANTER, ReplyStrategy.TOPIC_SHIFT, ReplyStrategy.PERSONAL,
+                    ReplyStrategy.RE_OPENER, ReplyStrategy.TOPIC_EXPANSION);
+        }
+        return generationNumber % 2 == 0
+                ? List.of(ReplyStrategy.BANTER, ReplyStrategy.TOPIC_EXPANSION, ReplyStrategy.PERSONAL,
+                ReplyStrategy.STORY_CONTINUATION, ReplyStrategy.THOUGHTFUL, ReplyStrategy.TOPIC_SHIFT)
+                : List.of(ReplyStrategy.LIGHT_FLIRTING, ReplyStrategy.THOUGHTFUL, ReplyStrategy.TOPIC_SHIFT,
+                ReplyStrategy.TEASE, ReplyStrategy.CURIOUS, ReplyStrategy.PERSONAL);
     }
 
     private void addStrategy(

@@ -2,6 +2,7 @@ package com.datingapp.chat.replycoach.service;
 
 import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
 import com.datingapp.chat.replycoach.model.ConversationContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -35,6 +36,17 @@ public class ReplyCoachQualityFilter {
             Pattern.CASE_INSENSITIVE
     );
 
+    private final ReplySemanticSimilarity semanticSimilarity;
+
+    @Autowired
+    public ReplyCoachQualityFilter(ReplySemanticSimilarity semanticSimilarity) {
+        this.semanticSimilarity = semanticSimilarity != null ? semanticSimilarity : new ReplySemanticSimilarity();
+    }
+
+    public ReplyCoachQualityFilter() {
+        this(new ReplySemanticSimilarity());
+    }
+
     public List<ReplySuggestionItem> filter(
             List<ReplySuggestionItem> suggestions,
             List<String> rejectedTexts,
@@ -66,6 +78,7 @@ public class ReplyCoachQualityFilter {
 
         List<ReplySuggestionItem> passed = new ArrayList<>();
         Set<String> seenNormalized = new HashSet<>();
+        List<ReplySuggestionItem> seenItems = new ArrayList<>();
 
         for (ReplySuggestionItem item : suggestions) {
             if (item == null || item.getText() == null) continue;
@@ -78,20 +91,23 @@ public class ReplyCoachQualityFilter {
             // Anti-hallucination check
             if (FABRICATED_EXPERIENCE_PATTERNS.matcher(text).find()) continue;
             if (appearsToInventUserFact(text, context)) continue;
+            if (context != null && !context.isEmpty() && semanticSimilarity.isGeneric(text)) continue;
+            if (isEmotionallyInappropriate(text, context)) continue;
 
             String norm = normalize(text);
             if (seenNormalized.contains(norm)) continue;
             if (normalizedRejected.contains(norm)) continue;
-            if (normalizedRejected.stream().anyMatch(rejected -> similarity(norm, rejected) >= 0.55)) continue;
+            if (rejectedTexts != null && rejectedTexts.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .anyMatch(rejected -> semanticSimilarity.areSemanticallySimilar(text, rejected))) continue;
 
-            // Check near-duplicate (starts with identical 20 characters or high overlap)
-            boolean isNearDup = seenNormalized.stream()
-                    .anyMatch(s -> similarity(norm, s) >= 0.55
-                            || (norm.length() > 20 && s.length() > 20
-                            && norm.substring(0, 20).equals(s.substring(0, 20))));
+            // Semantic and lexical duplicate prevention across the candidate set.
+            boolean isNearDup = seenItems.stream()
+                    .anyMatch(seen -> semanticSimilarity.areSemanticallySimilar(item, seen));
             if (isNearDup) continue;
 
             seenNormalized.add(norm);
+            seenItems.add(item);
             passed.add(item);
 
             if (passed.size() >= maxCount) {
@@ -127,6 +143,18 @@ public class ReplyCoachQualityFilter {
                 .filter(knownUserFacts::contains)
                 .count();
         return supportedWords < 2;
+    }
+
+    private boolean isEmotionallyInappropriate(String text, ConversationContext context) {
+        if (context == null || context.isEmpty()) return false;
+        ConversationContext.ContextMessage latest = context.getLastMessage();
+        if (latest == null || latest.isCurrentUser() || latest.content() == null) return false;
+        String incoming = latest.content().toLowerCase(Locale.ROOT);
+        boolean negative = incoming.matches(".*\\b(bad|horrible|awful|sad|hurt|stressed|tired|exhausted|kharab|bura|pareshan)\\b.*")
+                || incoming.contains("😢") || incoming.contains("😭");
+        if (!negative) return false;
+        String reply = text.toLowerCase(Locale.ROOT).trim();
+        return reply.matches("^(nice|great|awesome|amazing|love that|sounds fun)[!. ]*$");
     }
 
     private double similarity(String left, String right) {

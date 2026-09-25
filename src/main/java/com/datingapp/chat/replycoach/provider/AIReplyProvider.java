@@ -6,9 +6,12 @@ import com.datingapp.chat.replycoach.dto.ReplySuggestionItem;
 import com.datingapp.chat.replycoach.model.ConversationAnalysis;
 import com.datingapp.chat.replycoach.model.ConversationContext;
 import com.datingapp.chat.replycoach.model.ConversationEnvironment;
+import com.datingapp.chat.replycoach.model.LatestMessageAnalysis;
+import com.datingapp.chat.replycoach.model.PartnerCommunicationProfile;
 import com.datingapp.chat.replycoach.model.UserWritingProfile;
 import com.datingapp.chat.replycoach.service.ReplyCoachPromptBuilder;
 import com.datingapp.chat.replycoach.service.ReplyIntentPlanner;
+import com.datingapp.chat.replycoach.service.SuggestionGenerationSession;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -89,6 +92,20 @@ public class AIReplyProvider {
             List<ReplyIntentPlanner.PlannedIntent> plannedIntents,
             List<String> rejectedTexts,
             int limit) {
+        return generateSuggestions(context, env, styleProfile, plannedIntents, rejectedTexts, limit,
+                null, null, null);
+    }
+
+    public Optional<GenerationResult> generateSuggestions(
+            ConversationContext context,
+            ConversationEnvironment env,
+            UserWritingProfile styleProfile,
+            List<ReplyIntentPlanner.PlannedIntent> plannedIntents,
+            List<String> rejectedTexts,
+            int limit,
+            LatestMessageAnalysis latest,
+            PartnerCommunicationProfile partnerStyle,
+            SuggestionGenerationSession.Snapshot session) {
 
         if (!isConfigured()) {
             log.info("AI Provider is not enabled or API key is not configured.");
@@ -102,8 +119,10 @@ public class AIReplyProvider {
                 ? properties.getModel().trim()
                 : "openai/gpt-oss-20b";
 
-        String systemPrompt = promptBuilder.buildSystemPrompt(targetCount, env, styleProfile, plannedIntents);
-        String userPrompt = promptBuilder.buildUserPrompt(context, env, rejectedTexts);
+        String systemPrompt = promptBuilder.buildSystemPrompt(
+                targetCount, env, styleProfile, plannedIntents, latest, partnerStyle, session);
+        String userPrompt = promptBuilder.buildUserPrompt(
+                context, env, rejectedTexts, latest, partnerStyle, session);
 
         try {
             Map<String, Object> body = new LinkedHashMap<>();

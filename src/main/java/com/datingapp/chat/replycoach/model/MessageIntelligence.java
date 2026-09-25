@@ -77,6 +77,8 @@ public record MessageIntelligence(
         JOKE,
         COMPLIMENT,
         INVITATION,
+        REQUEST,
+        SHARING_EXPERIENCE,
         EMOTIONAL_VENT,
         FLIRTING,
         TOPIC_CHANGE,
