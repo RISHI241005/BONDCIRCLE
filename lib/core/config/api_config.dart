@@ -42,4 +42,35 @@ class ApiConfig {
   static Uri get forgotPasswordVerifyCodeUri => Uri.parse('$baseUrl/api/auth/forgot-password/verify-code');
   static Uri get forgotPasswordResetUri => Uri.parse('$baseUrl/api/auth/forgot-password/reset');
   static Uri get profileMeUri => Uri.parse('$baseUrl/api/profile/me');
+
+  // Chat & Messaging URIs
+  static Uri get chatsUri => Uri.parse('$baseUrl/api/v1/chats');
+  static Uri chatMessagesUri(String conversationId) =>
+      Uri.parse('$baseUrl/api/v1/chats/$conversationId/messages');
+  static Uri chatMessageStatusUri(String conversationId, String messageId) =>
+      Uri.parse('$baseUrl/api/v1/chats/$conversationId/messages/$messageId/status');
+  static Uri chatTypingUri(String conversationId) =>
+      Uri.parse('$baseUrl/api/v1/chats/$conversationId/typing');
+
+  // AI Reply Coach & Icebreakers
+  static Uri get replySuggestionsUri =>
+      Uri.parse('$baseUrl/api/ai/reply-suggestions');
+  static Uri get replyRegenerateUri =>
+      Uri.parse('$baseUrl/api/ai/reply-suggestions/regenerate');
+  static Uri get replyFeedbackUri =>
+      Uri.parse('$baseUrl/api/ai/reply-suggestions/feedback');
+  static Uri get icebreakerSuggestionsUri =>
+      Uri.parse('$baseUrl/api/v1/icebreakers/suggestions');
+
+  // Trust & Safety
+  static Uri get blocksUri => Uri.parse('$baseUrl/api/v1/blocks');
+  static Uri get reportsUri => Uri.parse('$baseUrl/api/v1/reports');
+
+  // WebSocket Endpoint
+  static String get webSocketUrl {
+    final wsBase = baseUrl.startsWith('https://')
+        ? baseUrl.replaceFirst('https://', 'wss://')
+        : baseUrl.replaceFirst('http://', 'ws://');
+    return '$wsBase/ws';
+  }
 }

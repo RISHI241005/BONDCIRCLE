@@ -29,10 +29,22 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "phone", length = 20)
+    private String phone;
+
+    @Column(name = "interests", length = 500)
+    private String interests;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    private Status status = Status.ACTIVE;
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private UserProfile profile;
 
     public User() {
+        this.status = Status.ACTIVE;
+        this.createdAt = LocalDateTime.now();
     }
 
     public User(String name, String email, String passwordHash) {
@@ -40,6 +52,18 @@ public class User {
         this.email = email;
         this.passwordHash = passwordHash;
         this.emailVerified = true;
+        this.status = Status.ACTIVE;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    public User(String fullName, String phone, String email, String passwordHash) {
+        this.name = fullName;
+        this.phone = phone;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.emailVerified = true;
+        this.status = Status.ACTIVE;
+        this.createdAt = LocalDateTime.now();
     }
 
     @PrePersist
@@ -107,6 +131,59 @@ public class User {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getFullName() {
+        return name;
+    }
+
+    public void setFullName(String fullName) {
+        this.name = fullName;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getInterests() {
+        return interests;
+    }
+
+    public void setInterests(String interests) {
+        this.interests = interests;
+    }
+
+    public java.util.List<String> getInterestList() {
+        if (interests == null || interests.isBlank()) {
+            if (profile != null && profile.getInterests() != null && !profile.getInterests().isEmpty()) {
+                return profile.getInterests();
+            }
+            return java.util.Collections.emptyList();
+        }
+        return java.util.Arrays.stream(interests.split("\\|"))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .toList();
+    }
+
+    public void setInterestList(java.util.List<String> interests) {
+        this.interests = interests == null || interests.isEmpty() ? null : String.join("|", interests);
+    }
+
+    public Status getStatus() {
+        return status;
+    }
+
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+
+    public enum Status {
+        ACTIVE, INACTIVE, DELETED
     }
 
     public UserProfile getProfile() {

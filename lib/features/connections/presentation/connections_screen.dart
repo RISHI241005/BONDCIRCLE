@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/bondcircle_theme.dart';
 import '../../blind_bond/presentation/blind_bond_screen.dart';
+import '../../chat/data/chat_api_service.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../discover/presentation/discover_screen.dart';
@@ -22,6 +23,30 @@ class ConnectionsScreen extends StatefulWidget {
 
 class _ConnectionsScreenState extends State<ConnectionsScreen> {
   String _query = '';
+  List<_Connection> _dynamicConnections = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConversations();
+  }
+
+  Future<void> _loadConversations() async {
+    final list = await ChatApiService().getConversations();
+    if (!mounted || list.isEmpty) return;
+    setState(() {
+      _dynamicConnections = list.map((c) => _Connection(
+        name: c.partnerName,
+        circle: widget.joinedCircles.isNotEmpty ? widget.joinedCircles.first : 'BondCircle',
+        preview: c.lastMessage ?? 'Say hello!',
+        time: c.lastMessageTime ?? 'Now',
+        unread: c.unreadCount,
+        color: const Color(0xFF9E6DD7),
+        conversationId: c.id,
+        partnerId: c.partnerId,
+      )).toList();
+    });
+  }
 
   static const _connections = [
     _Connection(
@@ -50,11 +75,14 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
     ),
   ];
 
-  List<_Connection> get _visible => _connections.where((item) {
-    final query = _query.toLowerCase();
-    return item.name.toLowerCase().contains(query) ||
-        item.circle.toLowerCase().contains(query);
-  }).toList();
+  List<_Connection> get _visible {
+    final base = _dynamicConnections.isNotEmpty ? _dynamicConnections : _connections;
+    return base.where((item) {
+      final query = _query.toLowerCase();
+      return item.name.toLowerCase().contains(query) ||
+          item.circle.toLowerCase().contains(query);
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -141,6 +169,8 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                   builder: (_) => ChatScreen(
                     matchName: connection.name,
                     sharedCircle: connection.circle,
+                    conversationId: connection.conversationId,
+                    partnerId: connection.partnerId,
                   ),
                 ),
               ),
@@ -291,8 +321,12 @@ class _Connection {
     required this.time,
     required this.unread,
     required this.color,
+    this.conversationId,
+    this.partnerId,
   });
   final String name, circle, preview, time;
   final int unread;
   final Color color;
+  final String? conversationId;
+  final int? partnerId;
 }

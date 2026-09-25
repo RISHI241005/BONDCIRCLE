@@ -1,0 +1,105 @@
+/*!
+ * BondCircle Dashboard Specific Styles
+ */
+
+/* Conversation Item Hover States */
+.conversation-item {
+    border-left: 3px solid transparent;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.conversation-item.has-unread {
+    border-left: 3px solid var(--color-primary);
+    background-color: var(--color-primary-light);
+}
+
+.conversation-item:hover:not(.active):not(.has-unread) {
+    border-left: 3px solid transparent;
+    background-color: var(--color-bg-subtle);
+}
+
+/* Scrollbar for sidebar */
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: var(--color-bg);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: var(--radius-full);
+}
+
+.sidebar:hover::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-text-muted);
+}
+
+/* Active conversation indicator */
+.conversation-item.active {
+    position: relative;
+    background-color: var(--color-primary-light) !important;
+}
+
+.conversation-item.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: var(--color-primary);
+}
+
+/* Message status badges */
+.message-status {
+    font-size: var(--font-size-xs);
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    margin-left: var(--space-xs);
+    font-weight: normal;
+}
+
+.message-status-sent {
+    background-color: var(--color-bg-subtle);
+    color: var(--color-text-secondary);
+}
+
+.message-status-delivered {
+    background-color: var(--color-success-light);
+    color: var(--color-success);
+}
+
+.message-status-read {
+    background-color: var(--color-info-light);
+    color: var(--color-info);
+}
+
+.message-status-edited {
+    background-color: var(--color-warning-light);
+    color: var(--color-warning);
+}
+
+/* Typing indicator animation */
+.typing-indicator span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--color-text-muted);
+    border-radius: var(--radius-full);
+    animation: typingBounce 1.5s infinite;
+}
+
+@keyframes typingBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+/* Conversation list loading */
+.loading {
+    padding: var(--space-lg);
+    text-align: center;
+    color: var(--color-text-muted);
+    font-style: italic;
+}

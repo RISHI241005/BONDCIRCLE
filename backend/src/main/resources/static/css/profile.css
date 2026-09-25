@@ -1,0 +1,63 @@
+/*!
+ * BondCircle Profile Specific Styles
+ */
+
+/* Profile Card */
+.profile-card {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.profile-avatar {
+    font-size: var(--font-size-xxl);
+    font-weight: bold;
+    color: var(--color-primary);
+    min-width: 80px;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-primary-light);
+    border-radius: var(--radius-full);
+}
+
+.profile-body .info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--space-sm);
+    font-size: var(--font-size-md);
+}
+
+.profile-body .info-label {
+    color: var(--color-text-secondary);
+}
+
+.profile-body .info-value {
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-medium);
+}
+
+.profile-actions .btn {
+    width: 100%;
+    margin-top: var(--space-sm);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .profile-container {
+        margin: 0 var(--space-sm);
+        padding: var(--space-sm);
+    }
+}

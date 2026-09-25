@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Private, real-time conversations with people you know by phone number.">
+    <meta name="theme-color" content="#0b1020">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>BondCircle · Private chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/app.css?v=2.5.1">
+</head>
+<body>
+    <div class="bg-3d-scene" aria-hidden="true">
+        <div class="bg-grid-mesh"></div>
+        <div class="ambient-glow glow-1"></div>
+        <div class="ambient-glow glow-2"></div>
+        <div class="ambient-glow glow-3"></div>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <main id="authView" class="auth-layout">
+        <section class="auth-intro" aria-labelledby="welcomeTitle">
+            <a class="brand brand--light" href="/" aria-label="BondCircle home">
+                <span class="brand-mark" aria-hidden="true"><span></span><span></span></span>
+                <span>BondCircle</span>
+            </a>
+            <div class="intro-copy">
+                <p class="eyebrow">Your people, one tap away</p>
+                <h1 id="welcomeTitle">A quieter place to talk.</h1>
+                <p>Find someone by phone number and start a private, real-time conversation. No public feed. No noise.</p>
+            </div>
+            <div class="intro-preview" aria-hidden="true">
+                <div class="preview-row preview-row--right">Are you free this evening?</div>
+                <div class="preview-row preview-row--left">Absolutely. Call at 7?</div>
+                <div class="preview-status"><span></span> Delivered instantly</div>
+            </div>
+        </section>
+
+        <section class="auth-panel" aria-label="Account access">
+            <div class="auth-card">
+                <div class="mobile-brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span></span><span>BondCircle</span></div>
+                <div class="auth-tabs" role="tablist" aria-label="Sign in or register">
+                    <button id="loginTab" class="auth-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="loginForm">Sign in</button>
+                    <button id="registerTab" class="auth-tab" type="button" role="tab" aria-selected="false" aria-controls="registerForm">Create account</button>
+                </div>
+
+                <form id="loginForm" class="auth-form" novalidate>
+                    <div class="form-heading"><h2>Welcome back</h2><p>Use the phone number linked to your account.</p></div>
+                    <label>Phone number<input id="loginPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+91 98765 43210" required></label>
+                    <label>Password<input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="Your password" minlength="8" required></label>
+                    <p id="loginError" class="form-error" role="alert"></p>
+                    <button class="primary-button" type="submit"><span>Sign in</span><span aria-hidden="true">→</span></button>
+                </form>
+
+                <form id="registerForm" class="auth-form" hidden novalidate>
+                    <div class="form-heading"><h2>Create your account</h2><p>Your phone number helps people who know you find you.</p></div>
+                    <div class="field-row">
+                        <label>Full name<input id="registerName" name="fullName" autocomplete="name" placeholder="Rishi Kumar" maxlength="100" required></label>
+                        <label>Phone number<input id="registerPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+91 98765 43210" maxlength="20" required></label>
+                    </div>
+                    <label>Email<input id="registerEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" maxlength="100" required></label>
+                    <label>Interests <span class="optional-label">optional</span><input id="registerInterests" name="interests" autocomplete="off" placeholder="Travel, music, cooking" maxlength="300"></label>
+                    <p class="interest-hint">Separate interests with commas. These help create better conversation suggestions.</p>
+                    <div class="field-row">
+                        <label>Password<input id="registerPassword" name="password" type="password" autocomplete="new-password" placeholder="8+ strong characters" minlength="8" maxlength="128" required></label>
+                        <label>Confirm password<input id="registerConfirm" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Repeat password" minlength="8" maxlength="128" required></label>
+                    </div>
+                    <p class="password-hint">Use uppercase, lowercase, a number, and one of ! @ # $ % ^ &amp; *</p>
+                    <p id="registerError" class="form-error" role="alert"></p>
+                    <button class="primary-button" type="submit"><span>Create account</span><span aria-hidden="true">→</span></button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <main id="chatView" class="chat-app" hidden>
+        <header class="app-header">
+            <a class="brand" href="/" aria-label="BondCircle home"><span class="brand-mark" aria-hidden="true"><span></span><span></span></span><span>BondCircle</span></a>
+            <div class="account-actions">
+                <div class="live-state"><span id="liveDot" class="live-dot"></span><span id="liveLabel">Connecting</span></div>
+                <button id="interestsButton" class="interest-button" type="button" title="Edit your interests">My interests</button>
+                <div id="profileAvatar" class="avatar avatar--small" aria-hidden="true">BC</div>
+                <div class="account-copy"><strong id="profileName">Account</strong><span id="profilePhone"></span></div>
+                <button id="logoutButton" class="icon-button" type="button" title="Sign out" aria-label="Sign out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/></svg></button>
+            </div>
+        </header>
+
+        <div class="workspace">
+            <aside id="sidebar" class="sidebar" aria-label="Conversations">
+                <div class="sidebar-heading">
+                    <div><p class="eyebrow">Messages</p><h1>Chats</h1></div>
+                    <button id="focusSearchButton" class="icon-button icon-button--accent" type="button" title="New chat" aria-label="Start a new chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+                </div>
+                <form id="peopleSearchForm" class="phone-search" role="search">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <label class="sr-only" for="peopleSearchInput">Find a person by phone number</label>
+                    <input id="peopleSearchInput" type="tel" inputmode="tel" autocomplete="off" placeholder="Find by phone number" required>
+                    <button type="submit">Find</button>
+                </form>
+                <div id="searchResult" class="search-result" aria-live="polite"></div>
+                <div class="list-label"><span>Recent</span><span id="conversationCount">0 chats</span></div>
+                <div id="conversationList" class="conversation-list"><div class="list-loading"><span></span><span></span><span></span></div></div>
+            </aside>
+
+            <section id="conversationPane" class="conversation-pane" aria-label="Current conversation">
+                <div id="emptyConversation" class="conversation-empty">
+                    <div class="empty-orbit" aria-hidden="true"><span class="brand-mark brand-mark--large"><span></span><span></span></span></div>
+                    <h2>Start with a phone number</h2>
+                    <p>Find someone you know, then send your first message. Your conversation will appear here.</p>
+                    <button id="emptySearchButton" class="secondary-button" type="button">Find someone</button>
+                </div>
+                <div id="activeConversation" class="active-conversation" hidden>
+                    <!-- WhatsApp / Telegram Professional Header -->
+                    <header class="conversation-header">
+                        <button id="chatBackButton" class="icon-button chat-back-btn" type="button" title="Back to chats" aria-label="Back to chats">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                        </button>
+                        <div id="chatAvatar" class="avatar">?</div>
+                        <div class="conversation-person">
+                            <strong id="chatName">Conversation</strong>
+                            <span id="chatPresence"><span class="presence-dot"></span> Offline</span>
+                        </div>
+                        <div class="chat-header-actions">
+                            <button id="chatSearchBtn" class="icon-button" type="button" title="Search in chat" aria-label="Search in chat">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                            </button>
+                            <button id="voiceCallBtn" class="icon-button" type="button" title="Voice call" aria-label="Voice call">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            </button>
+                            <button id="videoCallBtn" class="icon-button" type="button" title="Video call" aria-label="Video call">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                            </button>
+                            <button id="iceBreakerButton" class="coach-button" type="button" aria-expanded="false" aria-controls="aiReplyCoachPanel" title="✨ AI Reply Coach">
+                                <span class="copilot-sparkle" aria-hidden="true">✨</span> AI Reply
+                            </button>
+                            <div class="chat-menu-wrapper">
+                                <button id="chatMenuBtn" class="icon-button" type="button" title="More options" aria-label="More options">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                                </button>
+                                <div id="chatMenuDropdown" class="chat-dropdown" hidden>
+                                    <button id="menuContactInfo" type="button">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg> Contact details
+                                    </button>
+                                    <button id="menuMute" type="button">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg> Mute notifications
+                                    </button>
+                                    <button id="menuClearChat" type="button">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Clear messages
+                                    </button>
+                                    <button id="menuBlock" class="menu-danger" type="button">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Block user
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <!-- In-Chat Search Bar -->
+                    <div id="chatSearchOverlay" class="chat-search-bar" hidden>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                        <input id="chatSearchInput" type="search" placeholder="Search in this chat…" autocomplete="off">
+                        <span id="chatSearchMatches" class="search-matches"></span>
+                        <button id="closeChatSearch" type="button" aria-label="Close search">✕</button>
+                    </div>
+
+                    <!-- Message Stream -->
+                    <div id="messageList" class="message-list" aria-live="polite" aria-label="Messages"></div>
+
+                    <!-- BOND CIRCLE — AI REPLY COACH PANEL -->
+                    <section id="aiReplyCoachPanel" class="reply-coach-panel" aria-label="AI Reply Coach" hidden>
+                        <div class="reply-coach-header">
+                            <div class="reply-coach-title-wrap">
+                                <span class="reply-coach-sparkle" aria-hidden="true">✨</span>
+                                <strong class="reply-coach-title">Suggested Replies</strong>
+                                <span id="replyCoachTopicBadge" class="reply-coach-badge" hidden></span>
+                            </div>
+                            <div class="reply-coach-actions">
+                                <button id="replyCoachRegenBtn" class="reply-coach-action-btn reply-coach-regen" type="button" title="Get different suggestions">
+                                    <span class="regen-icon" aria-hidden="true">🔄</span> More suggestions
+                                </button>
+                                <button id="replyCoachCloseBtn" class="reply-coach-action-btn reply-coach-close" type="button" title="Close suggestions" aria-label="Close">✕</button>
+                            </div>
+                        </div>
+                        <div id="replyCoachSuggestions" class="reply-coach-list"></div>
+                    </section>
+
+                    <div id="typingIndicator" class="typing" hidden><span></span><span></span><span></span><em>typing…</em></div>
+
+                    <!-- WhatsApp / Telegram Professional Composer -->
+                    <form id="messageForm" class="composer">
+                        <!-- Emoji Picker Button -->
+                        <button id="emojiButton" class="icon-button composer-tool-btn" type="button" title="Insert emoji" aria-label="Insert emoji">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                        </button>
+
+                        <!-- Attachment Picker Button -->
+                        <button id="attachButton" class="icon-button composer-tool-btn" type="button" title="Attach file or media" aria-label="Attach file">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        </button>
+
+                        <!-- ✨ AI Reply Coach Button in Composer -->
+                        <button id="aiReplyComposerBtn" class="icon-button composer-tool-btn ai-reply-btn" type="button" title="✨ AI Reply (Get 3 suggestions)" aria-label="AI Reply Suggestions">
+                            <span class="ai-reply-icon" aria-hidden="true">✨</span>
+                        </button>
+
+                        <div class="composer-input-wrapper">
+                            <label class="sr-only" for="messageInput">Message</label>
+                            <textarea id="messageInput" rows="1" maxlength="2000" placeholder="Type a message…" required></textarea>
+                            <span id="characterCount" class="character-count">0 / 2000</span>
+                        </div>
+
+                        <!-- Voice Note & Send Buttons (Dynamic switch) -->
+                        <button id="voiceNoteButton" class="icon-button voice-btn" type="button" title="Voice message" aria-label="Record voice note">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                        </button>
+                        <button id="sendButton" class="send-button" type="submit" aria-label="Send message" disabled hidden>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                        </button>
+
+                        <!-- Emoji Drawer Popup -->
+                        <div id="emojiDrawer" class="emoji-drawer" hidden>
+                            <div class="emoji-drawer-header"><span>Quick Emojis &amp; Reactions</span><button id="closeEmojiDrawer" type="button">✕</button></div>
+                            <div class="emoji-grid">
+                                <button type="button" class="emoji-btn" data-emoji="❤️">❤️</button>
+                                <button type="button" class="emoji-btn" data-emoji="😂">😂</button>
+                                <button type="button" class="emoji-btn" data-emoji="👍">👍</button>
+                                <button type="button" class="emoji-btn" data-emoji="🔥">🔥</button>
+                                <button type="button" class="emoji-btn" data-emoji="😍">😍</button>
+                                <button type="button" class="emoji-btn" data-emoji="🙏">🙏</button>
+                                <button type="button" class="emoji-btn" data-emoji="🎉">🎉</button>
+                                <button type="button" class="emoji-btn" data-emoji="💯">💯</button>
+                                <button type="button" class="emoji-btn" data-emoji="✨">✨</button>
+                                <button type="button" class="emoji-btn" data-emoji="☕">☕</button>
+                                <button type="button" class="emoji-btn" data-emoji="😊">😊</button>
+                                <button type="button" class="emoji-btn" data-emoji="🙌">🙌</button>
+                                <button type="button" class="emoji-btn" data-emoji="🥳">🥳</button>
+                                <button type="button" class="emoji-btn" data-emoji="🥺">🥺</button>
+                                <button type="button" class="emoji-btn" data-emoji="🚀">🚀</button>
+                                <button type="button" class="emoji-btn" data-emoji="🌸">🌸</button>
+                                <button type="button" class="emoji-btn" data-emoji="⚡">⚡</button>
+                                <button type="button" class="emoji-btn" data-emoji="🍕">🍕</button>
+                            </div>
+                        </div>
+
+                        <!-- Attachment Picker Popup -->
+                        <div id="attachmentMenu" class="attachment-menu" hidden>
+                            <button type="button" class="attach-item" data-type="photo">
+                                <span class="attach-icon attach-photo"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>
+                                <span>Photos &amp; Videos</span>
+                            </button>
+                            <button type="button" class="attach-item" data-type="document">
+                                <span class="attach-icon attach-doc"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+                                <span>Document</span>
+                            </button>
+                            <button type="button" class="attach-item" data-type="contact">
+                                <span class="attach-icon attach-contact"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                                <span>Contact</span>
+                            </button>
+                            <button type="button" class="attach-item" data-type="poll">
+                                <span class="attach-icon attach-poll"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                                <span>Poll</span>
+                            </button>
+                        </div>
+
+                        <p id="moderationHint" class="composer-warning" role="alert" hidden>
+                            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <span>Please review the inappropriate words before sending.</span>
+                        </p>
+                    </form>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <div id="interestsModal" class="moderation-overlay" hidden>
+        <section class="interests-dialog" role="dialog" aria-modal="true" aria-labelledby="interestsTitle">
+            <button id="interestsClose" class="moderation-close" type="button" aria-label="Close interests">×</button>
+            <p class="eyebrow">Personalize your ideas</p>
+            <h2 id="interestsTitle">What are you into?</h2>
+            <p>Add up to 10 interests. They are used to make conversation starters feel more natural.</p>
+            <form id="interestsForm">
+                <label for="interestsInput">Your interests</label>
+                <input id="interestsInput" autocomplete="off" maxlength="300" placeholder="Travel, cricket, films, cooking">
+                <p>Separate each interest with a comma.</p>
+                <button class="primary-button" type="submit"><span>Save interests</span></button>
+            </form>
+        </section>
+    </div>
+
+    <div id="moderationModal" class="moderation-overlay" hidden>
+        <section class="moderation-dialog" role="dialog" aria-modal="true" aria-labelledby="moderationTitle" aria-describedby="moderationDescription">
+            <button id="moderationClose" class="moderation-close" type="button" aria-label="Close warning">×</button>
+            <div class="moderation-alert-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M10.3 3.7 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 8v5M12 17h.01"/></svg>
+            </div>
+            <h2 id="moderationTitle">Inappropriate Language Detected</h2>
+            <p id="moderationDescription">Your message may contain inappropriate or offensive language. Please review it before sending.</p>
+            <div id="moderationTerms" class="moderation-terms" aria-label="Flagged words"></div>
+            <div class="moderation-note">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.2c0 4.6 3.2 8.4 7.5 9.8 4.3-1.4 7.5-5.2 7.5-9.8V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span>We aim to keep BondCircle a safe, respectful, and positive space for everyone.</span>
+            </div>
+            <div class="moderation-actions">
+                <button id="moderationSendAnyway" class="moderation-risk" type="button">Send at Your Own Risk</button>
+                <button id="moderationEdit" class="moderation-edit" type="button">Edit message</button>
+            </div>
+            <p class="moderation-footnote">Nothing has been sent yet.</p>
+        </section>
+    </div>
+
+    <!-- Audio/Video Calling Dialog (WhatsApp / Telegram style) -->
+    <div id="callModal" class="moderation-overlay" hidden>
+        <section class="call-dialog" role="dialog" aria-modal="true" aria-labelledby="callContactName">
+            <div class="call-avatar-wrap">
+                <div class="call-ripple ripple-1"></div>
+                <div class="call-ripple ripple-2"></div>
+                <div id="callAvatar" class="avatar call-avatar">?</div>
+            </div>
+            <h2 id="callContactName">User</h2>
+            <p id="callStatusText" class="call-status">Calling…</p>
+            <div class="call-type-badge"><span id="callTypeIcon">📞</span> <span id="callTypeLabel">Voice Call</span></div>
+            
+            <div class="call-controls">
+                <button id="callToggleMute" class="call-control-btn" type="button" title="Mute Microphone">
+                    <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                </button>
+                <button id="callToggleSpeaker" class="call-control-btn is-active" type="button" title="Speaker">
+                    <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                </button>
+                <button id="endCallBtn" class="call-control-btn call-end-btn" type="button" title="End Call">
+                    <svg viewBox="0 0 24 24"><path d="m3 21 18-18M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/></svg>
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Contact Info Dialog -->
+    <div id="contactInfoModal" class="moderation-overlay" hidden>
+        <section class="contact-info-dialog" role="dialog" aria-modal="true" aria-labelledby="infoContactName">
+            <button id="contactInfoClose" class="moderation-close" type="button" aria-label="Close">×</button>
+            <div id="infoContactAvatar" class="avatar contact-info-avatar">?</div>
+            <h2 id="infoContactName">Conversation</h2>
+            <p id="infoContactPhone" class="contact-info-phone"></p>
+            <div class="contact-info-stats">
+                <div class="stat-card">
+                    <strong>Encrypted</strong>
+                    <span>Private P2P chat</span>
+                </div>
+                <div class="stat-card">
+                    <strong>Realtime</strong>
+                    <span>Websocket Active</span>
+                </div>
+            </div>
+            <div class="contact-info-section">
+                <h3>Shared Media &amp; Files</h3>
+                <div class="contact-media-empty">No shared photos or documents yet</div>
+            </div>
+            <button id="closeContactInfoBtn" class="secondary-button" type="button" style="width:100%;margin-top:1.25rem;">Done</button>
+        </section>
+    </div>
+
+    <!-- AI Brain & BYOK Settings Modal -->
+    <div id="aiSettingsModal" class="moderation-overlay" hidden>
+        <section class="ai-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="aiSettingsTitle">
+            <div class="ai-settings-header">
+                <div class="ai-settings-title-wrap">
+                    <span class="ai-settings-icon">⚡</span>
+                    <div>
+                        <h2 id="aiSettingsTitle">AI Brain &amp; Key Settings</h2>
+                        <p class="ai-settings-subtitle">Connect your free API key for instant live conversational intelligence</p>
+                    </div>
+                </div>
+                <button id="closeAiSettingsModal" class="moderation-close" type="button" aria-label="Close AI Settings">×</button>
+            </div>
+
+            <div class="ai-settings-body">
+                <div class="ai-settings-field">
+                    <label for="aiProviderSelect"><strong>AI Provider</strong></label>
+                    <select id="aiProviderSelect" class="ai-settings-select">
+                        <option value="gemini" selected>Google Gemini (Free Tier - Recommended)</option>
+                        <option value="openai">OpenAI (ChatGPT GPT-4o / GPT-4o-mini)</option>
+                        <option value="groq">Groq (Ultra-fast Llama 3.3 70B)</option>
+                    </select>
+                </div>
+
+                <div class="ai-settings-field">
+                    <div class="ai-field-label-row">
+                        <label for="aiApiKeyInput"><strong>API Key</strong></label>
+                        <button id="toggleAiKeyVisibility" type="button" class="ai-key-toggle-btn" title="Show/Hide Key">👁️ Show</button>
+                    </div>
+                    <div class="ai-key-input-wrap">
+                        <input id="aiApiKeyInput" type="password" placeholder="Paste your API key here…" autocomplete="off" spellcheck="false">
+                    </div>
+                    <p id="aiKeyHelpText" class="ai-settings-hint">
+                        💡 Get a 100% free key with no credit card at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio ↗</a>
+                    </p>
+                </div>
+
+                <div class="ai-settings-field">
+                    <label for="aiModelInput"><strong>Model ID (Optional)</strong></label>
+                    <input id="aiModelInput" type="text" placeholder="Default: gemini-2.0-flash" autocomplete="off">
+                    <p class="ai-settings-hint">Leave blank to use the provider's fastest recommended model.</p>
+                </div>
+
+                <div class="ai-status-card" id="aiSettingsStatusCard">
+                    <div class="ai-status-indicator" id="aiStatusDot"></div>
+                    <div class="ai-status-text">
+                        <strong id="aiStatusTitle">Offline Engine Active</strong>
+                        <span id="aiStatusDesc">Using onboard smart rules, intent detection, and Hinglish banter. Connect a key for live generative LLM power!</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ai-settings-actions">
+                <button id="disconnectAiKeyBtn" class="ai-disconnect-btn" type="button">Disconnect Key</button>
+                <div class="ai-settings-right-actions">
+                    <button id="cancelAiSettingsBtn" class="secondary-button" type="button">Cancel</button>
+                    <button id="saveAiSettingsBtn" class="primary-button" type="button">Save &amp; Connect</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script type="module" src="/js/app.js?v=2.6.4"></script>
+</body>
+</html>

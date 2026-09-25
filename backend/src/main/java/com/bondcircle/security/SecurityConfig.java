@@ -42,6 +42,21 @@ public class SecurityConfig {
                                 "/api/auth/send-verification",
                                 "/api/auth/verify-code",
                                 "/api/auth/forgot-password/**",
+                                "/api/v1/users/login",
+                                "/api/v1/users/register",
+                                "/api/v1/health",
+                                "/ws/**",
+                                "/actuator/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/test/**",
+                                "/",
+                                "/*.html",
+                                "/css/**",
+                                "/js/**",
+                                "/assets/**",
+                                "/favicon.ico",
                                 "/error"
                         ).permitAll()
                         .anyRequest().authenticated()

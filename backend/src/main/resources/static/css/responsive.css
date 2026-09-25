@@ -1,0 +1,129 @@
+/*!
+ * BondCircle Responsive Design
+ * Mobile-first responsive adjustments
+ */
+
+/* Mobile Devices (max-width: 640px) */
+@media (max-width: 640px) {
+    .header {
+        padding: var(--space-sm);
+    }
+
+    .header .logo {
+        font-size: var(--font-size-lg);
+    }
+
+    .primary-nav a {
+        display: none;
+    }
+
+    .hero-section {
+        min-height: 60vh;
+    }
+
+    .hero-content h1 {
+        font-size: var(--font-size-xxl);
+    }
+
+    .dashboard,
+    .chat-container {
+        margin-top: var(--space-lg);
+    }
+
+    .sidebar,
+    .chat-sidebar {
+        order: -1;
+        width: 100%;
+    }
+    
+    .main-content {
+        order: 1;
+    }
+    
+    .chat-main {
+        width: 100%;
+    }
+    
+    .chat-header {
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+    }
+    
+    .typing-indicator {
+        order: -1;
+        width: 100%;
+    }
+    
+    .input-actions {
+        flex-direction: column;
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .send-btn {
+        width: 100%;
+        margin-top: var(--space-sm);
+    }
+    
+    .message-input {
+        font-size: var(--font-size-sm);
+    }
+    
+    .unread-badge {
+        display: none;
+    }
+    
+    .conversation-item {
+        padding: var(--space-xs) var(--space-sm);
+    }
+    
+    .conversation-avatar {
+        min-width: 30px;
+        font-size: var(--font-size-xs);
+    }
+}
+
+/* Tablet Devices (max-width: 1024px) */
+@media (max-width: 1024px) {
+    .dashboard,
+    .chat-container {
+        padding: 0 var(--space-sm);
+    }
+
+    .sidebar {
+        width: 220px;
+    }
+
+    .chat-sidebar {
+        width: 280px;
+    }
+
+    .conversation-item {
+        padding: var(--space-sm) var(--space-md);
+    }
+
+    .conversation-avatar {
+        min-width: 35px;
+        font-size: var(--font-size-sm);
+    }
+
+    .unread-badge {
+        min-width: 16px;
+        padding: var(--space-xs) var(--space-sm);
+        font-size: var(--font-size-xxs);
+    }
+}
+
+/* Print Styles */
+@media print {
+    .header,
+    .primary-nav,
+    .chat-input-bar {
+        display: none;
+    }
+
+    .container {
+        max-width: 100%;
+        padding: 0;
+    }
+}

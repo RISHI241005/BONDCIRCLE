@@ -41,20 +41,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         final String jwt = authHeader.substring(7);
         try {
-            final String userEmail = jwtService.extractEmail(jwt);
+            if (SecurityContextHolder.getContext().getAuthentication() == null && jwtService.validateToken(jwt)) {
+                String subject = null;
+                try {
+                    subject = jwtService.extractEmail(jwt);
+                } catch (Exception ignored) {}
 
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                userRepository.findByEmail(userEmail).ifPresent(user -> {
-                    if (jwtService.isTokenValid(jwt, user.getEmail())) {
-                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                                user,
-                                null,
-                                Collections.emptyList()
-                        );
-                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(authToken);
-                    }
-                });
+                com.bondcircle.entity.User user = null;
+                if (subject != null && subject.contains("@")) {
+                    user = userRepository.findByEmail(subject).orElse(null);
+                }
+
+                Long userId = null;
+                try {
+                    userId = jwtService.extractUserId(jwt);
+                } catch (Exception ignored) {}
+
+                if (user == null && userId != null) {
+                    user = userRepository.findById(userId).orElse(null);
+                }
+
+                Object principal = user;
+                if (principal == null && userId != null) {
+                    principal = com.datingapp.chat.security.UserPrincipal.create(userId, jwtService.extractRoles(jwt));
+                }
+
+                if (principal != null) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            principal,
+                            null,
+                            principal instanceof com.datingapp.chat.security.UserPrincipal up ? up.getAuthorities() : Collections.emptyList()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
         } catch (Exception ignored) {
             // Invalid token, context remains unauthenticated

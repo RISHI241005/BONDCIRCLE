@@ -2,16 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/bondcircle_theme.dart';
 import '../../meetup/presentation/meetup_planner_screen.dart';
+import '../data/chat_api_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
     required this.matchName,
     required this.sharedCircle,
+    this.conversationId,
+    this.partnerId,
+    this.chatService,
   });
 
   final String matchName;
   final String sharedCircle;
+  final String? conversationId;
+  final int? partnerId;
+  final ChatApiService? chatService;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -21,10 +28,20 @@ class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   late final List<_ChatMessage> _messages;
+  late final ChatApiService _chatService;
+
+  List<String> _starters = [
+    'Favourite café?',
+    'Weekend plan?',
+    'What are you reading?',
+  ];
+  String? _lastSuggestionId;
+  bool _isLoadingSuggestions = false;
 
   @override
   void initState() {
     super.initState();
+    _chatService = widget.chatService ?? ChatApiService();
     _messages = [
       _ChatMessage(
         text: 'You matched through ${widget.sharedCircle}',
@@ -45,6 +62,60 @@ class _ChatScreenState extends State<ChatScreen> {
         time: '5:32 PM',
       ),
     ];
+
+    if (widget.conversationId != null) {
+      _loadBackendHistory();
+      _fetchAiSuggestions();
+    }
+  }
+
+  Future<void> _loadBackendHistory() async {
+    final convId = widget.conversationId;
+    if (convId == null) return;
+
+    final backendMsgs = await _chatService.getMessages(convId);
+    if (!mounted || backendMsgs.isEmpty) return;
+
+    setState(() {
+      _messages.clear();
+      _messages.add(
+        _ChatMessage(
+          text: 'You matched through ${widget.sharedCircle}',
+          type: _MessageType.system,
+        ),
+      );
+      for (final m in backendMsgs) {
+        _messages.add(
+          _ChatMessage(
+            text: m.content,
+            type: m.isMine ? _MessageType.sent : _MessageType.received,
+            time: m.createdAt != null
+                ? '${m.createdAt!.hour % 12 == 0 ? 12 : m.createdAt!.hour % 12}:${m.createdAt!.minute.toString().padLeft(2, '0')} ${m.createdAt!.hour >= 12 ? 'PM' : 'AM'}'
+                : 'Now',
+          ),
+        );
+      }
+    });
+    _scrollToBottom();
+  }
+
+  Future<void> _fetchAiSuggestions() async {
+    final convId = widget.conversationId;
+    if (convId == null || _isLoadingSuggestions) return;
+
+    setState(() => _isLoadingSuggestions = true);
+    final response = await _chatService.getReplySuggestions(conversationId: convId, limit: 3);
+    if (!mounted) return;
+
+    if (response != null && response.suggestions.isNotEmpty) {
+      setState(() {
+        _starters = response.suggestions.map((s) => s.text).toList();
+        _lastSuggestionId = response.suggestions.first.id;
+        _isLoadingSuggestions = false;
+      });
+    } else {
+      setState(() => _isLoadingSuggestions = false);
+    }
   }
 
   @override
@@ -54,15 +125,7 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage([String? suppliedText]) {
-    final text = (suppliedText ?? _messageController.text).trim();
-    if (text.isEmpty) return;
-    setState(() {
-      _messages.add(
-        _ChatMessage(text: text, type: _MessageType.sent, time: 'Now'),
-      );
-      _messageController.clear();
-    });
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -72,6 +135,33 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     });
+  }
+
+  void _sendMessage([String? suppliedText]) {
+    final text = (suppliedText ?? _messageController.text).trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _messages.add(
+        _ChatMessage(text: text, type: _MessageType.sent, time: 'Now'),
+      );
+      _messageController.clear();
+    });
+    _scrollToBottom();
+
+    final convId = widget.conversationId;
+    if (convId != null) {
+      _chatService.sendMessage(conversationId: convId, content: text);
+      if (suppliedText != null && _lastSuggestionId != null) {
+        _chatService.recordSuggestionFeedback(
+          suggestionId: _lastSuggestionId!,
+          conversationId: convId,
+          action: 'USED',
+          finalMessage: text,
+        );
+      }
+      _fetchAiSuggestions();
+    }
   }
 
   @override
@@ -187,7 +277,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     _MessageBubble(message: _messages[index]),
               ),
             ),
-            _ConversationStarters(onSelected: _sendMessage),
+            _ConversationStarters(
+              starters: _starters,
+              onSelected: _sendMessage,
+            ),
             _Composer(controller: _messageController, onSend: _sendMessage),
           ],
         ),
@@ -212,23 +305,91 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               const SizedBox(height: 10),
               ListTile(
-                leading: const Icon(Icons.block_rounded),
+                leading: const Icon(Icons.block_rounded, color: Colors.redAccent),
                 title: Text('Block ${widget.matchName}'),
                 subtitle: const Text(
                   'They will no longer be able to contact you.',
                 ),
-                onTap: () => Navigator.of(context).pop(),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  if (widget.partnerId != null) {
+                    await _chatService.blockUser(blockedUserId: widget.partnerId!);
+                  }
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Blocked ${widget.matchName}')),
+                  );
+                  Navigator.of(context).pop();
+                },
               ),
               ListTile(
-                leading: const Icon(Icons.flag_outlined),
+                leading: const Icon(Icons.flag_outlined, color: Colors.orangeAccent),
                 title: const Text('Report a concern'),
                 subtitle: const Text(
-                  'Reporting will be connected to the backend later.',
+                  'Report harassment, spam, or inappropriate behavior.',
                 ),
-                onTap: () => Navigator.of(context).pop(),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showReportDialog();
+                },
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showReportDialog() async {
+    String selectedReason = 'HARASSMENT';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Report ${widget.matchName}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Please select the reason for reporting this user:'),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedReason,
+                items: const [
+                  DropdownMenuItem(value: 'HARASSMENT', child: Text('Harassment or bullying')),
+                  DropdownMenuItem(value: 'INAPPROPRIATE_CONTENT', child: Text('Inappropriate content')),
+                  DropdownMenuItem(value: 'SPAM_OR_SCAM', child: Text('Spam or scam')),
+                  DropdownMenuItem(value: 'FAKE_PROFILE', child: Text('Fake profile')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setDialogState(() => selectedReason = val);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                if (widget.partnerId != null) {
+                  await _chatService.reportUser(
+                    reportedUserId: widget.partnerId!,
+                    reason: selectedReason,
+                  );
+                }
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Report submitted. Thank you for keeping BondCircle safe.'),
+                  ),
+                );
+              },
+              child: const Text('Submit Report'),
+            ),
+          ],
         ),
       ),
     );
@@ -296,28 +457,31 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _ConversationStarters extends StatelessWidget {
-  const _ConversationStarters({required this.onSelected});
+  const _ConversationStarters({
+    required this.onSelected,
+    required this.starters,
+  });
 
   final ValueChanged<String> onSelected;
+  final List<String> starters;
 
   @override
   Widget build(BuildContext context) {
-    const starters = [
-      'Favourite café?',
-      'Weekend plan?',
-      'What are you reading?',
-    ];
     return SizedBox(
       height: 46,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         itemCount: starters.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) => ActionChip(
           key: Key('starter$index'),
           avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
-          label: Text(starters[index]),
+          label: Text(
+            starters[index].length > 40
+                ? '${starters[index].substring(0, 37)}…'
+                : starters[index],
+          ),
           onPressed: () => onSelected(starters[index]),
         ),
       ),

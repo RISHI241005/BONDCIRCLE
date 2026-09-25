@@ -50,3 +50,9 @@ app.*.map.json
 
 # Maven
 **/target/
+
+# Local environment & tools
+.env
+.vscode/
+.tools/
+.kilo/

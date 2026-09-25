@@ -1,0 +1,54 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: false
+  flyway:
+    enabled: false
+
+jwt:
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  expiration-ms: 86400000
+
+brevo:
+  api-key: test-key
+  sender-email: test@bondcircle.com
+  sender-name: BondCircle Test
+  api-url: https://api.brevo.com/v3/smtp/email
+
+verification:
+  expiration-minutes: 10
+  cooldown-seconds: 60
+  max-attempts: 5
+
+chat:
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    issuer: bondcircle-auth-service
+    expiration-ms: 86400000
+  rate-limit:
+    enabled: false
+    max-requests: 120
+    window-seconds: 60
+  moderation:
+    enabled: true
+    block-level: high
+
+ai:
+  reply-coach:
+    offline-fallback-enabled: true
+    rate-limit-per-minute: 60
+    provider: groq
+
+groq:
+  api-key: test-key
+  model: llama-3.3-70b-versatile
+  base-url: https://api.groq.com/openai/v1

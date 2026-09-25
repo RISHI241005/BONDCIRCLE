@@ -31,3 +31,27 @@ verification:
   expiration-minutes: ${VERIFICATION_EXPIRATION_MINUTES:10}
   cooldown-seconds: ${VERIFICATION_COOLDOWN_SECONDS:60}
   max-attempts: ${VERIFICATION_MAX_ATTEMPTS:5}
+
+chat:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    issuer: bondcircle-auth-service
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  rate-limit:
+    enabled: false
+    max-requests: 120
+    window-seconds: 60
+  moderation:
+    enabled: true
+    block-level: high
+
+ai:
+  reply-coach:
+    offline-fallback-enabled: true
+    rate-limit-per-minute: 60
+    provider: groq
+
+groq:
+  api-key: ${GROQ_API_KEY:}
+  model: llama-3.3-70b-versatile
+  base-url: https://api.groq.com/openai/v1

@@ -1,0 +1,157 @@
+/*!
+ * BondCircle Frontend Design Tokens
+ * Color system, typography, spacing, and breakpoints
+ */
+
+:root {
+    /* Color System */
+    --color-primary: #0066ff;
+    --color-primary-dark: #0052cc;
+    --color-primary-light: #e6f0ff;
+    --color-secondary: #6c757d;
+    --color-success: #28a745;
+    --color-warning: #ffc107;
+    --color-error: #dc3545;
+    --color-info: #17a2b8;
+
+    /* Background Colors */
+    --color-bg: #fafafa;
+    --color-bg-elevated: #ffffff;
+    --color-bg-subtle: #f8f9fa;
+    --color-card: #ffffff;
+    --color-border: #dee2e6;
+
+    /* Text Colors */
+    --color-text-primary: #333333;
+    --color-text-secondary: #6c757d;
+    --color-text-muted: #868e96;
+    --color-text-inverse: #ffffff;
+
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-full: 9999px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.15);
+    --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+
+    /* Typography */
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-md: 1rem;
+    --font-size-lg: 1.25rem;
+    --font-size-xl: 1.5rem;
+    --font-size-xxl: 2rem;
+
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-bold: 700;
+
+    /* Spacing Scale */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-xxl: 3rem;
+
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+    --transition-slow: 350ms ease;
+
+    /* Z-Index */
+    --z-index-dropdown: 1000;
+    --z-index-sticky: 1020;
+    --z-index-modal: 1050;
+    --z-index-tooltip: 1070;
+}
+
+/* Color utilities */
+.color-primary { color: var(--color-primary); }
+.color-primary-dark { color: var(--color-primary-dark); }
+.color-secondary { color: var(--color-secondary); }
+.color-success { color: var(--color-success); }
+.color-warning { color: var(--color-warning); }
+.color-error { color: var(--color-error); }
+.color-text-primary { color: var(--color-text-primary); }
+.color-text-secondary { color: var(--color-text-secondary); }
+.color-text-muted { color: var(--color-text-muted); }
+
+/* Background utilities */
+.bg-primary { background-color: var(--color-primary); }
+.bg-primary-dark { background-color: var(--color-primary-dark); }
+.bg-primary-light { background-color: var(--color-primary-light); }
+.bg-bg { background-color: var(--color-bg); }
+.bg-bg-elevated { background-color: var(--color-bg-elevated); }
+.bg-card { background-color: var(--color-card); }
+-bg-subtle { background-color: var(--color-bg-subtle); }
+
+/* Radius utilities */
+.radius-sm { border-radius: var(--radius-sm); }
+.radius-md { border-radius: var(--radius-md); }
+.radius-lg { border-radius: var(--radius-lg); }
+.radius-full { border-radius: var(--radius-full); }
+
+/* Shadow utilities */
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-inset { box-shadow: var(--shadow-inset); }
+
+/* Typography utilities */
+.font-weight-normal { font-weight: var(--font-weight-normal); }
+.font-weight-medium { font-weight: var(--font-weight-medium); }
+.font-weight-bold { font-weight: var(--font-weight-bold); }
+
+/* Spacing utilities */
+.space-xxxs { margin/padding: calc(var(--space-xs) * 0.5) !important; }
+.space-xs { margin/padding: var(--space-xs) !important; }
+.space-sm { margin/padding: var(--space-sm) !important; }
+.space-md { margin/padding: var(--space-md) !important; }
+.space-lg { margin/padding: var(--space-lg) !important; }
+.space-xl { margin/padding: var(--space-xl) !important; }
+.space-xxl { margin/padding: var(--space-xxl) !important; }
+
+/* Display utilities */
+.d-none { display: none !important; }
+.d-block { display: block !important; }
+.d-flex { display: flex !important; }
+.d-inline-flex { display: inline-flex !important; }
+.d-inline { display: inline !important; }
+
+/* Position utilities */
+.pos-relative { position: relative; }
+.pos-absolute { position: absolute; }
+.pos-fixed { position: fixed; }
+
+/* Overflow utilities */
+.overflow-hidden { overflow: hidden; }
+.overflow-auto { overflow: auto; }
+
+/* Flex utilities */
+.flex-row { flex-direction: row !important; }
+.flex-col { flex-direction: column !important; }
+.justify-start { justify-content: flex-start !important; }
+.justify-end { justify-content: flex-end !important; }
+.justify-center { justify-content: center !important; }
+.align-start { align-items: flex-start !important; }
+.align-end { align-items: flex-end !important; }
+.align-center { align-items: center !important; }
+.align-stretch { align-items: stretch !important; }
+.items-start { align-self: start !important; }
+.items-end { align-self: end !important; }
+-items-center { align-self: center !important; }
+
+/* Visibility */
+.visible { visibility: visible; }
+.invisible { visibility: hidden; }
+
+/* Opacity */
+.opacity-0 { opacity: 0; }
+.opacity-50 { opacity: 0.5; }
+.opacity-100 { opacity: 1; }

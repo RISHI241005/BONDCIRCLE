@@ -1,0 +1,116 @@
+/*!
+ * BondCircle Chat Specific Styles
+ */
+
+/* Message Bounds */
+.message {
+    margin-bottom: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    max-width: 80%;
+    word-wrap: break-word;
+    font-size: var(--font-size-sm);
+}
+
+.message.outgoing {
+    margin-left: auto;
+    background-color: var(--color-primary);
+    color: var(--color-text-inverse);
+    border-bottom-right-radius: 2px;
+}
+
+.message.incoming {
+    margin-right: auto;
+    background-color: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+    border-bottom-left-radius: 2px;
+    border: 1px solid var(--color-border);
+}
+
+/* Message Content */
+.message-content {
+    display: block;
+    margin-bottom: var(--space-xxs);
+    line-height: 1.4;
+}
+
+.message-meta {
+    font-size: var(--font-size-xxs);
+    opacity: 0.8;
+    margin-top: var(--space-xxs);
+}
+
+/* Message Status */
+.message-status {
+    font-size: var(--font-size-xs);
+    opacity: 0.7;
+    margin-top: var(--space-xxs);
+    display: block;
+}
+
+/* Incoming message status colors */
+.message-status-sent {
+    color: var(--color-text-muted);
+    background-color: transparent;
+}
+
+.message-status-delivered {
+    color: var(--color-success);
+    background-color: rgba(40, 167, 69, 0.1);
+    padding: 1px 4px;
+    border-radius: var(--radius-xs);
+}
+
+.message-status-read {
+    color: var(--color-info);
+    background-color: rgba(23, 162, 184, 0.1);
+    padding: 1px 4px;
+    border-radius: var(--radius-xs);
+}
+
+/* Outgoing message status */
+.message-status-edited {
+    color: var(--color-warning);
+    background-color: rgba(255, 193, 7, 0.1);
+    padding: 1px 4px;
+    border-radius: var(--radius-xs);
+}
+
+/* Input Area */
+.message-input {
+    border: 1px solid var(--color-border);
+    background-color: var(--color-bg);
+    transition: border-color var(--transition-fast);
+}
+
+.message-input:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 100px var(--color-bg) inset;
+    -webkit-text-fill-color: var(--color-text-primary);
+}
+
+/* Send Button */
+.send-btn {
+    min-width: 80px;
+}
+
+/* Emoji Button */
+.emoji-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Sidebar Badges */
+.unread-badge {
+    font-weight: 600;
+    font-size: 0.65em;
+}
+
+/* Loading State */
+.loading {
+    padding: var(--space-lg);
+    text-align: center;
+    color: var(--color-text-muted);
+}

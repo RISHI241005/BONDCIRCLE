@@ -160,11 +160,13 @@ void main() {
       expect(resetBtn.onPressed, isNotNull);
 
       // Tap Reset Password
+      await tester.ensureVisible(find.byKey(const Key('recoveryContinue')));
       await tester.tap(find.byKey(const Key('recoveryContinue')));
       await tester.pumpAndSettle();
 
       // Step 3: Success & return to Sign In
       expect(find.text('You’re ready to sign in'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('recoveryContinue')));
       await tester.tap(find.byKey(const Key('recoveryContinue')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('forgotPasswordButton')), findsOneWidget);
